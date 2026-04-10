@@ -180,4 +180,21 @@ enum Fixtures {
       }
     }
     """#
+
+    /// `GET /auth/me` response for an account where Listen is not enabled.
+    /// Used by `TokenEntryViewModelTests` to verify the listen-disabled
+    /// branch of the verification flow.
+    static let authMeListenDisabled = #"""
+    {
+      "data": {
+        "user": {
+          "id": "u_xyz",
+          "display_name": "Test",
+          "role": "free",
+          "listen_enabled": false,
+          "preferred_platform": null
+        }
+      }
+    }
+    """#
 }

@@ -9,9 +9,13 @@ import SwiftUI
 
 @main
 struct ListenerApp: App {
+
+    @StateObject private var auth = AuthState(storage: KeychainManager())
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(auth)
         }
     }
 }
