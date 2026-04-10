@@ -12,23 +12,27 @@ import Foundation
 /// One method per endpoint, all `async throws`. Authentication, error envelope
 /// decoding, rate-limit parsing, and 401 → sign-out are all handled centrally
 /// in `request(...)` so call sites stay tiny.
+///
+/// The actor depends on an `HTTPClient` rather than a concrete `URLSession`
+/// so tests can substitute a `StubHTTPClient` without going through
+/// `URLProtocol`. Production wires `URLSession.shared` by default.
 actor ListenerAPI {
 
     static let defaultBaseURL = URL(string: "https://mixmat.es/api/v1/listener")!
 
     let baseURL: URL
-    let session: URLSession
+    let client: HTTPClient
     let tokenProvider: @Sendable () async -> String?
     let onUnauthorized: @Sendable () async -> Void
 
     init(
         baseURL: URL = ListenerAPI.defaultBaseURL,
-        session: URLSession = .shared,
+        client: HTTPClient = URLSession.shared,
         tokenProvider: @Sendable @escaping () async -> String?,
         onUnauthorized: @Sendable @escaping () async -> Void = {}
     ) {
         self.baseURL = baseURL
-        self.session = session
+        self.client = client
         self.tokenProvider = tokenProvider
         self.onUnauthorized = onUnauthorized
     }
@@ -108,7 +112,7 @@ actor ListenerAPI {
     // MARK: - Request plumbing
 
     /// Build the request, send it, and turn the response into either a decoded
-    /// `T` or an `APIError`. This is the only place that touches `URLSession`,
+    /// `T` or an `APIError`. This is the only place that touches `HTTPClient`,
     /// so retries, logging, or interceptors can be added in one spot.
     private func request<T: Decodable>(
         path: String,
@@ -128,15 +132,11 @@ actor ListenerAPI {
         )
 
         let data: Data
-        let response: URLResponse
+        let http: HTTPURLResponse
         do {
-            (data, response) = try await session.data(for: urlRequest)
+            (data, http) = try await client.send(urlRequest)
         } catch let error as URLError {
             throw APIError.network(error)
-        }
-
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.unexpected("Response was not an HTTPURLResponse")
         }
 
         switch http.statusCode {
