@@ -90,9 +90,9 @@ actor ListenerAPI {
         return ShareOutcome(dto: dto)
     }
 
-    func groups() async throws -> [Group] {
-        let dto: GroupListDTO = try await request(path: "groups", method: "GET")
-        return dto.items.map(Group.init(dto:))
+    func groups() async throws -> [HumanGroup] {
+        let dto: HumanGroupListDTO = try await request(path: "groups", method: "GET")
+        return dto.items.map(HumanGroup.init(dto:))
     }
 
     func recordings() async throws -> [Recording] {

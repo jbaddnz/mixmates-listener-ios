@@ -118,8 +118,8 @@ struct DecodingTests {
     // MARK: - Groups
 
     @Test func decodesGroups() throws {
-        let envelope = try decoder.decode(APIResponse<GroupListDTO>.self, from: Data(Fixtures.groups.utf8))
-        let groups = envelope.data.items.map(Group.init(dto:))
+        let envelope = try decoder.decode(APIResponse<HumanGroupListDTO>.self, from: Data(Fixtures.groups.utf8))
+        let groups = envelope.data.items.map(HumanGroup.init(dto:))
 
         #expect(groups.count == 2)
         #expect(groups[0].id == "g1")
