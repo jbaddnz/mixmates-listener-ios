@@ -1,0 +1,91 @@
+# MixMates Listener for iOS
+
+An open-source reference implementation of a music recognition app for iOS, built on the [MixMates Listener API](https://github.com/jbaddnz/mixmates-listener-api).
+
+Hold your iPhone up to a song, and it records a short clip, identifies the track, and gives you one-tap links to open it on Spotify, Tidal, or Apple Music. Think of it as an open, cross-platform Shazam — with the full source code in your hands.
+
+This is a working app, but it's also a starting point. Fork it, restyle it, add features, build something better. The API is documented, the code is MIT-licensed, and the architecture is intentionally straightforward.
+
+## What it does
+
+- **Audio recognition** — 11-second recording, automatic identification via the MixMates API
+- **Cross-platform links** — Spotify, Tidal, and Apple Music deep links for every match
+- **Listen queue** — browse and manage your recognition history
+- **Group sharing** — share tracks to your MixMates groups
+- **Offline support** — queued recordings sync when connectivity returns
+- **Share sheet** — send share links to friends via any app
+
+## Make it your own
+
+This reference implementation covers the core flows — record, recognise, browse, share. There's plenty of room to build on top of it:
+
+- Design your own UI and branding
+- Add a Lock Screen or Home Screen widget for one-tap recognition
+- Build a Live Activity so recognition progress shows in the Dynamic Island
+- Add an Apple Watch companion to record from your wrist
+- Wire up a Siri App Intent — "Hey Siri, identify this song"
+- Build a Share Extension to recognise audio shared from other apps
+
+Or take it in a completely different direction.
+
+## Getting started
+
+### Requirements
+
+- iOS 16.0 or higher
+- [Xcode](https://developer.apple.com/xcode/) 26 or higher
+- A [MixMates](https://mixmat.es) account with Listen enabled
+- A Listen Key (generated in MixMates Settings > Listening)
+
+A free Apple ID is enough to build and run on a physical device. An Apple Developer Program subscription is only needed for App Store distribution.
+
+### Build and run
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/jbaddnz/mixmates-listener-ios.git
+   ```
+
+2. Open `Listener.xcodeproj` in Xcode
+
+3. Pick an iOS Simulator or a connected device and hit **Product > Run** (⌘R)
+
+### Simulator tips
+
+- The iOS Simulator does not pass through your Mac's microphone, so audio recognition itself cannot be tested in a simulator. Run on a physical device for full end-to-end testing.
+- Everything else — networking, history, group sharing, navigation — works fine on the simulator and is enough for developing every screen except the recording flow.
+
+## Architecture
+
+- **Language**: Swift
+- **UI**: SwiftUI
+- **Architecture**: MVVM with `ObservableObject` and `@Published`
+- **Networking**: `URLSession` + `Codable`
+- **Local storage**: SwiftData (offline queue), Keychain Services (token)
+- **Background sync**: `BGTaskScheduler`
+- **Image loading**: `AsyncImage`
+- **Dependency injection**: SwiftUI `Environment` + init injection
+- **Testing**: Swift Testing
+- **No third-party dependencies** — everything uses native Apple frameworks
+
+## API
+
+This app integrates with the [MixMates Listener API v1](https://github.com/jbaddnz/mixmates-listener-api). The API handles audio recognition, listen queue management, group sharing, and cross-platform link resolution.
+
+## On openness
+
+This is an open-source client for a commercial API. The code is MIT-licensed and entirely yours to read, fork, and modify. The service behind the API is not — it runs on infrastructure that costs money to operate because we're serious about providing a good base for musical expression.
+
+What we can do is make everything around it open: the client code, the API specification, the documentation. You can see exactly what data leaves your device (an audio clip and a bearer token), exactly where it goes (mixmat.es), and exactly what comes back. There are no third-party SDKs in this app — no analytics, no tracking, no telemetry of any kind.
+
+We think that's an honest trade-off, and we'd rather be upfront about it than pretend it isn't there.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports, feature ideas, and pull requests are all welcome.
+
+## License
+
+[MIT](LICENSE) — use it however you like.
+
+_Apple and Apple Music are trademarks of Apple Inc., registered in the U.S. and other countries._
