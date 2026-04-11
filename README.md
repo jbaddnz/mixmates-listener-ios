@@ -10,14 +10,13 @@ This is a working app, but it's also a starting point. Fork it, restyle it, add 
 
 - **Audio recognition** — 11-second recording, automatic identification via the MixMates API
 - **Cross-platform links** — Spotify, Tidal, and Apple Music deep links for every match
-- **Listen queue** — browse and manage your recognition history
-- **Group sharing** — share tracks to your MixMates groups
-- **Offline support** — queued recordings sync when connectivity returns
-- **Share sheet** — send share links to friends via any app
+- **Listen queue** — browse your recognition history with swipe-to-delete
+- **Permission-aware UI** — clear handling of mic permission states with a path to Settings
+- **Splash on/off** — Settings toggle for the launch animation
 
 ## Make it your own
 
-This reference implementation covers the core flows — record, recognise, browse, share. There's plenty of room to build on top of it:
+This reference implementation covers the core flows — record, recognise, and browse your listen queue. There's plenty of room to build on top of it:
 
 - Design your own UI and branding
 - Add a Lock Screen or Home Screen widget for one-tap recognition
@@ -53,19 +52,18 @@ A free Apple ID is enough to build and run on a physical device. An Apple Develo
 ### Simulator tips
 
 - The iOS Simulator does not pass through your Mac's microphone, so audio recognition itself cannot be tested in a simulator. Run on a physical device for full end-to-end testing.
-- Everything else — networking, history, group sharing, navigation — works fine on the simulator and is enough for developing every screen except the recording flow.
+- Everything else — networking, history, navigation, settings — works fine on the simulator and is enough for developing every screen except the recording flow.
 
 ## Architecture
 
 - **Language**: Swift
 - **UI**: SwiftUI
 - **Architecture**: MVVM with `ObservableObject` and `@Published`
-- **Networking**: `URLSession` + `Codable`
-- **Local storage**: SwiftData (offline queue), Keychain Services (token)
-- **Background sync**: `BGTaskScheduler`
+- **Networking**: `URLSession` + `Codable`, single `actor` API client
+- **Local storage**: Keychain Services for the Listen key
 - **Image loading**: `AsyncImage`
 - **Dependency injection**: SwiftUI `Environment` + init injection
-- **Testing**: Swift Testing
+- **Testing**: Swift Testing (`@Suite`, `@Test`, `#expect`)
 - **No third-party dependencies** — everything uses native Apple frameworks
 
 ## API

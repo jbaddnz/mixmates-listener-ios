@@ -158,9 +158,8 @@ final class AVAudioRecorderImpl: NSObject, AudioRecording {
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("m4a")
 
-        // Recording settings per `ios-listener-app.md`: AAC, 44.1kHz, mono,
-        // medium quality. Targets ~150-200KB for an 11-second clip, well
-        // under the server's 5MB cap.
+        // AAC, 44.1kHz, mono, medium quality. Targets ~150-200KB for an
+        // 11-second clip, well under the server's 5MB cap.
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: 44100.0,
