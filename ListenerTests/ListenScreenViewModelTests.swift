@@ -227,8 +227,16 @@ struct ListenScreenViewModelTests {
             await viewModel.record(token: "test-token", onUnauthorized: {})
         }
 
-        // Give the loop a moment to start ticking.
-        try? await Task.sleep(for: .milliseconds(50))
+        // Wait for the loop to actually start ticking — polling
+        // `recordingProgress > 0` proves the inner Task has been created,
+        // assigned to `recordingTask`, and has executed at least one body
+        // iteration. A fixed sleep here is unsafe on slow CI runners
+        // where the MainActor scheduler can take >50ms to get the inner
+        // task running, leaving `recordingTask` still nil when we call
+        // stopRecording() and turning the cancel into a silent no-op.
+        while viewModel.recordingProgress == 0.0 {
+            await Task.yield()
+        }
         viewModel.stopRecording()
 
         // Wait for the full record flow (loop exit + stop + recognise)
