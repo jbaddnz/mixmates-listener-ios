@@ -397,25 +397,38 @@ final class ListenScreenViewModel: ObservableObject {
         state = .recording
         recordingProgress = 0.0
 
-        // Spawn the timer task. The view model awaits its completion so
-        // the call returns when the full flow finishes (matches the test
-        // assertion pattern from the previous protocol shape).
-        let task = Task { @MainActor in
+        // Spawn the timer loop in its own Task so `stopRecording()` can
+        // cancel it from outside. **Only the loop is cancellable** — the
+        // recognition step that follows must run in the outer (non-
+        // cancelled) `record()` context, otherwise `URLSession.send` sees
+        // `Task.isCancelled` from this inner task and immediately throws
+        // `URLError.cancelled`. That bug shipped to hardware once because
+        // `StubHTTPClient` doesn't honour task cancellation, so the unit
+        // tests passed even though Stop early was broken on real devices.
+        // See `stopEarlyRecognitionRunsAfterCancellation` for the test
+        // that locks this in.
+        let loopTask = Task { @MainActor in
             await self.runRecordingLoop()
-            await self.finishRecordingAndRecognise(
-                token: token,
-                onUnauthorized: onUnauthorized
-            )
         }
-        self.recordingTask = task
-        await task.value
+        self.recordingTask = loopTask
+        await loopTask.value
         self.recordingTask = nil
+
+        // We're back in the outer Task here, which is NOT cancelled —
+        // even if `loopTask` was cancelled by `stopRecording()`. This is
+        // exactly what lets the recognition request go through after
+        // Stop early.
+        await self.finishRecordingAndRecognise(
+            token: token,
+            onUnauthorized: onUnauthorized
+        )
     }
 
-    /// "Stop early" action — cancel the running timer task. The loop sees
-    /// `Task.isCancelled` on its next tick and breaks out, then proceeds
-    /// to call `stop()` and submit normally. The user gets whatever audio
-    /// has been captured so far.
+    /// "Stop early" action — cancel the running timer loop. The loop sees
+    /// `Task.isCancelled` on its next iteration and breaks out, after
+    /// which `record()` proceeds to `finishRecordingAndRecognise` in its
+    /// own (uncancelled) context. The user gets whatever audio has been
+    /// captured so far, sent to the API normally.
     func stopRecording() {
         recordingTask?.cancel()
     }
