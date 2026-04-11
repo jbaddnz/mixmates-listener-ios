@@ -97,53 +97,13 @@ struct ListenScreen: View {
     private func resultView(for result: RecognitionResult) -> some View {
         if let track = result.track {
             VStack(spacing: 16) {
-                if let thumbnail = track.thumbnail {
-                    AsyncImage(url: thumbnail) { image in
-                        image.resizable().aspectRatio(contentMode: .fit)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.gray.opacity(0.2))
-                    }
-                    .frame(width: 200, height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                VStack(spacing: 4) {
-                    Text(track.title)
-                        .font(.title2.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                    Text(track.artist)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack(spacing: 8) {
-                    if let spotify = track.platforms.spotify {
-                        Link("Spotify", destination: spotify)
-                            .buttonStyle(.bordered)
-                    }
-                    if let tidal = track.platforms.tidal {
-                        Link("Tidal", destination: tidal)
-                            .buttonStyle(.bordered)
-                    }
-                    if let appleMusic = track.platforms.appleMusic {
-                        Link("Apple Music", destination: appleMusic)
-                            .buttonStyle(.bordered)
-                    }
-                }
-
-                if let shareURL = track.shareURL {
-                    ShareLink(item: shareURL) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.bordered)
-                }
+                TrackCard(track: track, isDuplicate: result.status == .duplicate)
+                    .padding(.horizontal)
 
                 Button("Listen again") {
                     viewModel.reset()
                 }
                 .buttonStyle(.borderedProminent)
-                .padding(.top, 8)
             }
         } else {
             VStack(spacing: 16) {

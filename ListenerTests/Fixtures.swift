@@ -160,6 +160,25 @@ enum Fixtures {
     }
     """#
 
+    /// `GET /history/{id}` response for a track that has not been shared
+    /// to any groups yet. Used by tests that need an empty initial selection
+    /// in `HistoryDetailScreen`.
+    static let historyDetailNoShares = #"""
+    {
+      "data": {
+        "id": "h_2",
+        "title": "Strobe",
+        "artist": "deadmau5",
+        "thumbnail": null,
+        "shortcode": "xYz12345",
+        "share_url": "https://mixmat.es/xYz12345",
+        "platforms": {},
+        "created_at": "2026-04-09T22:30:00Z",
+        "shared_to": []
+      }
+    }
+    """#
+
     static let historyDelete = #"""
     { "data": { "deleted": true } }
     """#
