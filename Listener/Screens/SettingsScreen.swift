@@ -7,18 +7,28 @@
 
 import SwiftUI
 
-/// Settings screen. Three sections in an iOS-native `Form` layout:
+/// Settings screen. Four sections in an iOS-native `Form` layout:
 /// - **Appearance**: a single "Show splash screen" toggle, opt-out for the
 ///   1-second SwiftUI splash continuation that runs after the OS-level
 ///   `UILaunchScreen`. Default on.
 /// - **Legal**: a `NavigationLink` to `LegalScreen`, which holds the
 ///   in-app trademark credit line, links to the web-hosted privacy and
 ///   terms pages, and About info.
-/// - **Account**: the "Remove Listen Key" destructive action with a
-///   confirmation alert, plus a brand footer crediting the app and linking
-///   to the marketing site.
+/// - **Sign out**: the "Remove Listen Key" destructive action with a
+///   confirmation alert. Local-only — clears the Keychain entry, the
+///   account at mixmat.es is untouched.
+/// - **Delete account**: a destructive action that, after confirmation,
+///   opens `mixmat.es/account/delete` in Safari. The web side renders the
+///   typed-confirmation modal directly on landing for authenticated users
+///   (or after sign-in for anonymous ones). Required by App Store Review
+///   Guideline 5.1.1(v) — apps that "support account creation" must offer
+///   in-app deletion. The Listener doesn't create accounts (paste-a-key
+///   model), but reviewers still flag the absence and Apple's account
+///   deletion guidance explicitly allows linking to a web URL when full
+///   in-app deletion isn't possible. The brand footer hangs off this
+///   bottom-most section.
 ///
-/// No view model — the only state is the alert visibility (`@State`) and
+/// No view model — state is just the two alert visibilities (`@State`) and
 /// the splash preference (`@AppStorage`, shared with `ContentView`). The
 /// only async action is `auth.signOut()`, reached directly through the
 /// `AuthState` environment object. Adding a `SettingsViewModel` would be a
@@ -32,8 +42,12 @@ import SwiftUI
 struct SettingsScreen: View {
 
     @EnvironmentObject private var auth: AuthState
+    @Environment(\.openURL) private var openURL
     @AppStorage("showSplashScreen") private var showSplashEnabled: Bool = true
     @State private var showRemoveConfirmation = false
+    @State private var showDeleteAccountConfirmation = false
+
+    private static let deleteAccountURL = URL(string: "https://mixmat.es/account/delete")!
 
     var body: some View {
         Form {
@@ -55,6 +69,17 @@ struct SettingsScreen: View {
                         .frame(maxWidth: .infinity)
                 }
             } footer: {
+                Text("Removes the key from this device. Your account at mixmat.es stays active.")
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    showDeleteAccountConfirmation = true
+                } label: {
+                    Text("Delete account")
+                        .frame(maxWidth: .infinity)
+                }
+            } footer: {
                 brandFooter
             }
         }
@@ -67,6 +92,14 @@ struct SettingsScreen: View {
             }
         } message: {
             Text("You'll need to enter it again to use the app.")
+        }
+        .alert("Delete your account?", isPresented: $showDeleteAccountConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Continue", role: .destructive) {
+                openURL(Self.deleteAccountURL)
+            }
+        } message: {
+            Text("You'll be taken to mixmat.es to confirm. Deleting permanently removes your Listen Key, recognition history, and all associated data. This cannot be undone.")
         }
     }
 
