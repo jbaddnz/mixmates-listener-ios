@@ -31,15 +31,29 @@ struct ListenScreen: View {
             }
 
             Spacer()
-
-            Button("Sign out", role: .destructive) {
-                auth.signOut()
-            }
-            .buttonStyle(.bordered)
-            .padding(.bottom)
         }
         .padding()
         .animation(.default, value: viewModel.state)
+        .navigationTitle("Listen")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                NavigationLink {
+                    HistoryScreen()
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+                .accessibilityLabel("History")
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                NavigationLink {
+                    SettingsScreen()
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .accessibilityLabel("Settings")
+            }
+        }
     }
 
     // MARK: - State views
