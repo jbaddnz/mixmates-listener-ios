@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+          xcrun simctl list runtimes | grep iOS || true
+
+      - name: Pick latest iPhone simulator
+        id: simulator
+        run: |
+          # Find the newest available iPhone simulator on the runner.
+          # Avoids hardcoding a specific iPhone model that may not exist.
+          DEVICE=$(xcrun simctl list devices available --json \
+            | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = []
+          for runtime, items in data['devices'].items():
+              if 'iOS' not in runtime:
+                  continue
+              for item in items:
+                  if 'iPhone' in item['name']:
+                      devices.append(item['udid'])
+          print(devices[-1] if devices else '')
+          ")
+          if [ -z "$DEVICE" ]; then
+            echo "No iPhone simulator found" >&2
+            exit 1
+          fi
+          echo "udid=$DEVICE" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project Listener.xcodeproj \
+            -scheme Listener \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project Listener.xcodeproj \
+            -scheme Listener \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -only-testing:ListenerTests \
+            CODE_SIGNING_ALLOWED=NO

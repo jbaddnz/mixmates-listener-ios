@@ -53,3 +53,6 @@ fastlane/test_output
 # Internal planning, drafts, and notes — not for the public repo
 docs/
 CLAUDE.md
+
+# App icon render output (regeneratable from assets/render-icon.py)
+assets/mml-icon.png
