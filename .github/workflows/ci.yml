@@ -50,14 +50,17 @@ jobs:
           xcodebuild build \
             -project Listener.xcodeproj \
             -scheme Listener \
-            -destination "id=${{ steps.simulator.outputs.udid }}" \
-            CODE_SIGNING_ALLOWED=NO
+            -destination "id=${{ steps.simulator.outputs.udid }}"
 
       - name: Test
         run: |
+          # Note: do NOT set CODE_SIGNING_ALLOWED=NO. KeychainManagerTests
+          # exercise the real Security framework and the simulator keychain
+          # returns errSecMissingEntitlement (-34018) unless the test bundle
+          # is code-signed. xcodebuild ad-hoc signs simulator builds by
+          # default, which is sufficient for keychain access to work.
           xcodebuild test \
             -project Listener.xcodeproj \
             -scheme Listener \
             -destination "id=${{ steps.simulator.outputs.udid }}" \
-            -only-testing:ListenerTests \
-            CODE_SIGNING_ALLOWED=NO
+            -only-testing:ListenerTests
