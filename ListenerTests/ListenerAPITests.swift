@@ -12,8 +12,6 @@ import Foundation
 @Suite("ListenerAPI")
 struct ListenerAPITests {
 
-    private let baseURL = URL(string: "https://test.example/api/v1/listener")!
-
     // MARK: - Helpers
 
     private func makeAPI(
@@ -22,37 +20,17 @@ struct ListenerAPITests {
         handler: @escaping @Sendable (URLRequest) throws -> (Data, HTTPURLResponse)
     ) -> ListenerAPI {
         ListenerAPI(
-            baseURL: baseURL,
+            baseURL: StubResponses.url,
             client: StubHTTPClient(handler: handler),
             tokenProvider: { token },
             onUnauthorized: onUnauthorized
         )
     }
 
-    private func ok(_ json: String) -> (Data, HTTPURLResponse) {
-        let response = HTTPURLResponse(
-            url: baseURL,
-            statusCode: 200,
-            httpVersion: "HTTP/1.1",
-            headerFields: nil
-        )!
-        return (Data(json.utf8), response)
-    }
-
-    private func http(_ status: Int, body: String = "", headers: [String: String] = [:]) -> (Data, HTTPURLResponse) {
-        let response = HTTPURLResponse(
-            url: baseURL,
-            statusCode: status,
-            httpVersion: "HTTP/1.1",
-            headerFields: headers
-        )!
-        return (Data(body.utf8), response)
-    }
-
     // MARK: - Successful requests
 
     @Test func healthSucceeds() async throws {
-        let api = makeAPI(handler: { _ in self.ok(Fixtures.health) })
+        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.health) })
         let health = try await api.health()
         #expect(health.status == "ok")
         #expect(health.version == "1")
@@ -62,7 +40,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.health)
+            return StubResponses.ok(Fixtures.health)
         })
         _ = try await api.health()
         #expect(captured.value?.value(forHTTPHeaderField: "Authorization") == nil)
@@ -72,14 +50,14 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(token: "key_xyz", handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.authMe)
+            return StubResponses.ok(Fixtures.authMe)
         })
         _ = try await api.me()
         #expect(captured.value?.value(forHTTPHeaderField: "Authorization") == "Bearer key_xyz")
     }
 
     @Test func meReturnsParsedProfile() async throws {
-        let api = makeAPI(handler: { _ in self.ok(Fixtures.authMe) })
+        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.authMe) })
         let profile = try await api.me()
         #expect(profile.displayName == "Jamie")
         #expect(profile.role == .paid)
@@ -90,7 +68,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.history)
+            return StubResponses.ok(Fixtures.history)
         })
         _ = try await api.history(cursor: "abc", limit: 10)
 
@@ -105,7 +83,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.history)
+            return StubResponses.ok(Fixtures.history)
         })
         _ = try await api.history()
 
@@ -117,7 +95,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.historyDetail)
+            return StubResponses.ok(Fixtures.historyDetail)
         })
         _ = try await api.historyDetail(id: "h_1")
 
@@ -129,7 +107,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.historyDelete)
+            return StubResponses.ok(Fixtures.historyDelete)
         })
         try await api.deleteHistory(id: "h_1")
 
@@ -141,7 +119,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.share)
+            return StubResponses.ok(Fixtures.share)
         })
         let outcome = try await api.shareHistory(id: "h_1", groupIds: ["g1", "g2"])
 
@@ -154,7 +132,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return self.ok(Fixtures.recognizeSaved)
+            return StubResponses.ok(Fixtures.recognizeSaved)
         })
         let result = try await api.recognize(audio: Data([0x00, 0x01, 0x02]), mimeType: "audio/mp4")
 
@@ -169,7 +147,7 @@ struct ListenerAPITests {
         let signal = UnauthorizedSignal()
         let api = makeAPI(
             onUnauthorized: { await signal.fire() },
-            handler: { _ in self.http(401, body: Fixtures.errorEnvelope) }
+            handler: { _ in StubResponses.http(401, body: Fixtures.errorEnvelope) }
         )
 
         do {
@@ -186,7 +164,7 @@ struct ListenerAPITests {
 
     @Test func rateLimited429ParsesHeaders() async throws {
         let api = makeAPI(handler: { _ in
-            self.http(429, headers: ["Retry-After": "30", "X-RateLimit-Remaining": "0"])
+            StubResponses.http(429, headers: ["Retry-After": "30", "X-RateLimit-Remaining": "0"])
         })
 
         do {
@@ -201,7 +179,7 @@ struct ListenerAPITests {
     }
 
     @Test func rateLimited429FallsBackWhenHeadersMissing() async throws {
-        let api = makeAPI(handler: { _ in self.http(429) })
+        let api = makeAPI(handler: { _ in StubResponses.http(429) })
 
         do {
             _ = try await api.me()
@@ -215,7 +193,7 @@ struct ListenerAPITests {
     }
 
     @Test func badGateway502BecomesRecognitionUnavailable() async throws {
-        let api = makeAPI(handler: { _ in self.http(502) })
+        let api = makeAPI(handler: { _ in StubResponses.http(502) })
 
         do {
             _ = try await api.recognize(audio: Data(), mimeType: "audio/mp4")
@@ -229,7 +207,7 @@ struct ListenerAPITests {
 
     @Test func http400PreservesParsedPayload() async throws {
         let api = makeAPI(handler: { _ in
-            self.http(400, body: #"{"error":{"code":"audio_too_large","message":"Audio file exceeds 5MB limit"}}"#)
+            StubResponses.http(400, body: #"{"error":{"code":"audio_too_large","message":"Audio file exceeds 5MB limit"}}"#)
         })
 
         do {
@@ -258,7 +236,7 @@ struct ListenerAPITests {
     }
 
     @Test func malformedJSONBecomesDecodingError() async throws {
-        let api = makeAPI(handler: { _ in self.ok("{not valid json}") })
+        let api = makeAPI(handler: { _ in StubResponses.ok("{not valid json}") })
 
         do {
             _ = try await api.me()

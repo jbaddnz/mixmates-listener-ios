@@ -10,11 +10,12 @@ import Foundation
 @testable import Listener
 
 /// `@MainActor` because the system under test (`TokenEntryViewModel`) is
-/// `@MainActor`. Stub-response constructors live in a file-private free
-/// namespace below so they don't inherit `@MainActor` isolation —
-/// `StubHTTPClient` invokes its handler from the `ListenerAPI` actor's
-/// executor, which is not the main actor, so any `@MainActor`-isolated
-/// helper would fail to compile when called from there.
+/// `@MainActor`. Canned `(Data, HTTPURLResponse)` tuples come from the
+/// shared `StubResponses` namespace in `StubResponses.swift` — they live at
+/// file scope rather than as instance helpers because `StubHTTPClient`
+/// invokes its handler from the `ListenerAPI` actor's executor (not the
+/// main actor), and `@MainActor`-isolated instance methods would be
+/// unreachable from inside the `@Sendable` handler closure.
 @Suite("TokenEntryViewModel")
 @MainActor
 struct TokenEntryViewModelTests {
@@ -121,39 +122,3 @@ struct TokenEntryViewModelTests {
     }
 }
 
-// MARK: - Stub response helpers
-
-/// File-private free namespace for constructing canned `(Data, HTTPURLResponse)`
-/// tuples. Lives outside the test struct deliberately: `StubHTTPClient` invokes
-/// its handler from the `ListenerAPI` actor's executor (not the main actor),
-/// so any helper that lived as a `@MainActor` instance method on the test
-/// struct would be unreachable from inside the handler closure. A free `enum`
-/// namespace has no isolation, so it's callable from anywhere.
-private enum StubResponses {
-
-    static let url = URL(string: "https://test.example/api/v1/listener")!
-
-    static func ok(_ json: String) -> (Data, HTTPURLResponse) {
-        let response = HTTPURLResponse(
-            url: url,
-            statusCode: 200,
-            httpVersion: "HTTP/1.1",
-            headerFields: nil
-        )!
-        return (Data(json.utf8), response)
-    }
-
-    static func http(
-        _ status: Int,
-        body: String = "",
-        headers: [String: String] = [:]
-    ) -> (Data, HTTPURLResponse) {
-        let response = HTTPURLResponse(
-            url: url,
-            statusCode: status,
-            httpVersion: "HTTP/1.1",
-            headerFields: headers
-        )!
-        return (Data(body.utf8), response)
-    }
-}

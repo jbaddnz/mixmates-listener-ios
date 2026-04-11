@@ -10,11 +10,10 @@ import Foundation
 @testable import Listener
 
 /// `@MainActor` because the system under test (`ListenScreenViewModel`) is
-/// `@MainActor`. Stub-response constructors live in a file-private free
-/// namespace below for the same reason as in `TokenEntryViewModelTests` —
-/// they need to be reachable from `@Sendable` `StubHTTPClient` handler
-/// closures, which run from the `ListenerAPI` actor's executor (not the
-/// main actor).
+/// `@MainActor`. Canned `(Data, HTTPURLResponse)` tuples come from the
+/// shared `StubResponses` namespace in `StubResponses.swift` — see the
+/// doc comment there for why they live at file scope rather than as
+/// instance helpers.
 @Suite("ListenScreenViewModel")
 @MainActor
 struct ListenScreenViewModelTests {
@@ -191,42 +190,6 @@ struct ListenScreenViewModelTests {
         viewModel.reset()
 
         #expect(viewModel.state == .idle)
-    }
-}
-
-// MARK: - Stub response helpers
-
-/// File-private free namespace for constructing canned `(Data, HTTPURLResponse)`
-/// tuples. Same pattern as in `TokenEntryViewModelTests` — see that file for
-/// the reasoning. (DRY note: this is the third file with this helper. A
-/// future cleanup slice should extract it to a shared `StubResponses.swift`
-/// in the test target.)
-private enum StubResponses {
-
-    static let url = URL(string: "https://test.example/api/v1/listener")!
-
-    static func ok(_ json: String) -> (Data, HTTPURLResponse) {
-        let response = HTTPURLResponse(
-            url: url,
-            statusCode: 200,
-            httpVersion: "HTTP/1.1",
-            headerFields: nil
-        )!
-        return (Data(json.utf8), response)
-    }
-
-    static func http(
-        _ status: Int,
-        body: String = "",
-        headers: [String: String] = [:]
-    ) -> (Data, HTTPURLResponse) {
-        let response = HTTPURLResponse(
-            url: url,
-            statusCode: status,
-            httpVersion: "HTTP/1.1",
-            headerFields: headers
-        )!
-        return (Data(body.utf8), response)
     }
 }
 
