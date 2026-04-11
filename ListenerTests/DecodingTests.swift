@@ -93,7 +93,9 @@ struct DecodingTests {
         #expect(first.platforms.spotify == URL(string: "https://open.spotify.com/track/abc"))
         #expect(first.platforms.tidal == nil)
         #expect(first.platforms.appleMusic == nil)
-        #expect(first.createdAt == "2026-04-10T10:00:00Z")
+        // Wire format is ISO-8601 UTC; the domain promotes it to a `Date`.
+        // Timestamp is 2026-04-10T10:00:00Z verified with `date -ujf`.
+        #expect(first.createdAt == Date(timeIntervalSince1970: 1775815200))
 
         let second = list.items[1]
         #expect(second.thumbnail == nil)

@@ -99,6 +99,45 @@ enum Fixtures {
     }
     """#
 
+    /// First page of history with `cursor: null` and `has_more: false`.
+    /// Used by tests that exercise the empty / final-page branch of the
+    /// pagination state machine.
+    static let historyEmpty = #"""
+    {
+      "data": {
+        "items": [],
+        "cursor": null,
+        "has_more": false
+      }
+    }
+    """#
+
+    /// Second page of history (cursor exhausted). Different items than the
+    /// first page so pagination tests can verify items are appended, not
+    /// replaced.
+    static let historyPage2 = #"""
+    {
+      "data": {
+        "items": [
+          {
+            "id": "h_3",
+            "title": "Resonance",
+            "artist": "HOME",
+            "thumbnail": "https://img.example.com/home.jpg",
+            "shortcode": "rEsOn8nC",
+            "share_url": "https://mixmat.es/rEsOn8nC",
+            "platforms": {
+              "spotify": "https://open.spotify.com/track/home"
+            },
+            "created_at": "2026-04-08T15:00:00Z"
+          }
+        ],
+        "cursor": null,
+        "has_more": false
+      }
+    }
+    """#
+
     static let historyDetail = #"""
     {
       "data": {
