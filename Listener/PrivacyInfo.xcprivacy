@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Privacy manifest for the MixMates Listener iOS app.
+
+        Required by Apple since spring 2024 for any app that uses Required
+        Reason APIs or third-party SDKs. We have no third-party SDKs, so
+        the only declaration needed is the UserDefaults usage from
+        @AppStorage in SettingsScreen and ContentView (the splash toggle
+        preference).
+
+        Tracking is false because the app does no tracking of any kind:
+        no analytics, no advertising, no IDFA, no third-party telemetry.
+    -->
+
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!--
+                    CA92.1: Access info from same app, app extensions,
+                    and App Clips that are members of the same App Group.
+                    The "showSplashScreen" preference is set and read by
+                    the app itself only — no extensions, no app group
+                    sharing, no other readers.
+                -->
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
