@@ -7,43 +7,50 @@
 
 import SwiftUI
 
-/// Settings screen. Deliberately minimal: a single "Remove Listen Key"
-/// destructive action with a confirmation alert, plus a footer crediting
-/// the app and linking to the marketing site.
+/// Settings screen. Two sections in an iOS-native `Form` layout:
+/// - **Appearance**: a single "Show splash screen" toggle, opt-out for the
+///   1-second SwiftUI splash continuation that runs after the OS-level
+///   `UILaunchScreen`. Default on.
+/// - **Account**: the "Remove Listen Key" destructive action with a
+///   confirmation alert, plus a brand footer crediting the app and linking
+///   to the marketing site.
 ///
-/// No view model — the only state is the alert visibility (`@State`) and the
-/// only action is `auth.signOut()`, which is reached directly through the
-/// `AuthState` environment object. Adding a `SettingsViewModel` here would
-/// be a one-line wrapper around an existing operation, which the project's
-/// "no abstractions for one-time things" rule explicitly avoids.
+/// No view model — the only state is the alert visibility (`@State`) and
+/// the splash preference (`@AppStorage`, shared with `ContentView`). The
+/// only async action is `auth.signOut()`, reached directly through the
+/// `AuthState` environment object. Adding a `SettingsViewModel` would be a
+/// one-line wrapper around existing operations, which the project's "no
+/// abstractions for one-time things" rule explicitly avoids.
 ///
-/// No rate limit / display name / role display: matches the Android sibling's
-/// minimalism. The rate limit indicator surfaces on the Listen screen toolbar
-/// instead (deferred to a future slice).
+/// No display name / role / rate limit display — those live elsewhere
+/// (rate limit goes in the Listen screen toolbar). Matches the Android
+/// sibling's settings minimalism. There is no theme picker; see
+/// `docs/plans/proposed/theme-preference.md` (gitignored) for the rationale.
 struct SettingsScreen: View {
 
     @EnvironmentObject private var auth: AuthState
+    @AppStorage("showSplashScreen") private var showSplashEnabled: Bool = true
     @State private var showRemoveConfirmation = false
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Button(role: .destructive) {
-                showRemoveConfirmation = true
-            } label: {
-                Text("Remove Listen Key")
-                    .frame(maxWidth: .infinity)
+        Form {
+            Section {
+                Toggle("Show splash screen", isOn: $showSplashEnabled)
+            } footer: {
+                Text("Show the MML logo briefly when the app opens. Turn off to skip straight to the listen screen.")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .padding(.horizontal)
 
-            Spacer()
-
-            footer
+            Section {
+                Button(role: .destructive) {
+                    showRemoveConfirmation = true
+                } label: {
+                    Text("Remove Listen Key")
+                        .frame(maxWidth: .infinity)
+                }
+            } footer: {
+                brandFooter
+            }
         }
-        .padding()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Remove Listen Key?", isPresented: $showRemoveConfirmation) {
@@ -56,7 +63,7 @@ struct SettingsScreen: View {
         }
     }
 
-    private var footer: some View {
+    private var brandFooter: some View {
         VStack(spacing: 4) {
             Text("MixMates Listener")
                 .font(.caption)
@@ -70,7 +77,8 @@ struct SettingsScreen: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.bottom)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 16)
     }
 
     private var appVersion: String {
