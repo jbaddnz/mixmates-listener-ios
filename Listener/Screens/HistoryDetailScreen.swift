@@ -25,7 +25,6 @@ struct HistoryDetailScreen: View {
 
     @EnvironmentObject private var auth: AuthState
     @StateObject private var viewModel = HistoryDetailViewModel()
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         Group {
@@ -59,7 +58,7 @@ struct HistoryDetailScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 TrackCard(detail: detail)
 
-                openInMixMatesButton
+                OpenInMixMatesButton()
 
                 if !detail.sharedTo.isEmpty {
                     Divider()
@@ -73,30 +72,6 @@ struct HistoryDetailScreen: View {
             }
             .padding()
         }
-    }
-
-    private var openInMixMatesButton: some View {
-        Button {
-            openURL(URL(string: "https://mixmat.es/?listen=1")!)
-        } label: {
-            Text("Open in MixMates")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .foregroundStyle(.white)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 29 / 255, green: 185 / 255, blue: 84 / 255),  // Spotify green
-                            Color(red: 44 / 255, green: 204 / 255, blue: 211 / 255)  // cyan
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-        }
-        .buttonStyle(.plain)
     }
 
     private func sharedToSection(groups: [SharedGroup]) -> some View {

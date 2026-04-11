@@ -21,11 +21,32 @@ import Foundation
 /// `ListenScreenViewModel` and friends) are themselves `@MainActor`, so
 /// the constraint is invisible at the call site.
 protocol AudioRecording: Sendable {
+    /// Read the current microphone permission status without prompting
+    /// the user. Synchronous because the underlying Apple property getter
+    /// (`AVAudioApplication.recordPermission` or
+    /// `AVAudioSession.recordPermission`) is cached and synchronous. The
+    /// view model calls this on screen appear so the UI can show the
+    /// permission-denied prompt proactively if the user has previously
+    /// declined.
+    @MainActor
+    func currentPermissionStatus() -> AudioPermissionStatus
+
     /// Capture `duration` seconds of audio and return the encoded bytes.
     /// Throws `AudioRecordingError` for any failure (permission denied,
     /// session configuration, recording, file read).
     @MainActor
     func record(duration: TimeInterval) async throws -> Data
+}
+
+/// Microphone permission status, as reported by the underlying audio
+/// recorder. A small enum that decouples the view model from
+/// `AVFoundation`'s `AVAudioApplication.recordPermission` /
+/// `AVAudioSession.RecordPermission` types — the view model only knows
+/// about this domain enum, not the platform types.
+enum AudioPermissionStatus: Equatable {
+    case granted
+    case denied
+    case undetermined
 }
 
 /// Errors thrown by `AudioRecording` implementations. Mapped to user-facing
@@ -65,6 +86,24 @@ final class AVAudioRecorderImpl: NSObject, AudioRecording {
     /// main-actor-isolated state, so it is safe to escape isolation here.
     nonisolated override init() {
         super.init()
+    }
+
+    func currentPermissionStatus() -> AudioPermissionStatus {
+        if #available(iOS 17, *) {
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted: return .granted
+            case .denied: return .denied
+            case .undetermined: return .undetermined
+            @unknown default: return .undetermined
+            }
+        } else {
+            switch AVAudioSession.sharedInstance().recordPermission {
+            case .granted: return .granted
+            case .denied: return .denied
+            case .undetermined: return .undetermined
+            @unknown default: return .undetermined
+            }
+        }
     }
 
     func record(duration: TimeInterval) async throws -> Data {

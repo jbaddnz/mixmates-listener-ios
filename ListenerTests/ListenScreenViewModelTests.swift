@@ -76,7 +76,7 @@ struct ListenScreenViewModelTests {
         #expect(message.contains("Couldn't capture audio"))
     }
 
-    @Test func permissionDeniedShowsAccessMessage() async throws {
+    @Test func permissionDeniedFromRecordUpdatesPermissionStatusAndReturnsToIdle() async throws {
         let viewModel = ListenScreenViewModel(
             audioRecorder: FailingAudioRecorder(error: .permissionDenied),
             client: StubHTTPClient(handler: { _ in throw URLError(.unknown) })
@@ -84,11 +84,12 @@ struct ListenScreenViewModelTests {
 
         await viewModel.record(token: "test-token", onUnauthorized: {})
 
-        guard case .error(let message) = viewModel.state else {
-            Issue.record("Expected .error state")
-            return
-        }
-        #expect(message.contains("microphone access"))
+        // Permission denial doesn't go to .error — it updates
+        // permissionStatus and stays in .idle so the view re-renders to
+        // the dedicated permission-denied prompt with an "Open Settings"
+        // button (much better UX than a generic error message).
+        #expect(viewModel.permissionStatus == .denied)
+        #expect(viewModel.state == .idle)
     }
 
     // MARK: - Network errors
@@ -190,6 +191,116 @@ struct ListenScreenViewModelTests {
         viewModel.reset()
 
         #expect(viewModel.state == .idle)
+    }
+
+    // MARK: - Profile fetch
+
+    @Test func loadProfileSucceedsAndPopulatesProfile() async throws {
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(),
+            client: StubHTTPClient(handler: { _ in
+                StubResponses.ok(Fixtures.authMe)
+            })
+        )
+
+        await viewModel.loadProfile(token: "test-token", onUnauthorized: {})
+
+        #expect(viewModel.profile?.displayName == "Jamie")
+        #expect(viewModel.profile?.rateLimit?.remaining == 17)
+        #expect(viewModel.profile?.rateLimit?.limit == 20)
+    }
+
+    @Test func loadProfileNetworkFailureLeavesProfileNilAndStateUnchanged() async throws {
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(),
+            client: StubHTTPClient(handler: { _ in
+                throw URLError(.notConnectedToInternet)
+            })
+        )
+
+        await viewModel.loadProfile(token: "test-token", onUnauthorized: {})
+
+        // Profile fetch failures are deliberately silent — the profile is
+        // non-essential, the user can still record. No state change.
+        #expect(viewModel.profile == nil)
+        #expect(viewModel.state == .idle)
+    }
+
+    @Test func loadProfileUnauthorizedFiresCallback() async throws {
+        let signal = UnauthorizedSignal()
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(),
+            client: StubHTTPClient(handler: { _ in
+                StubResponses.http(401, body: Fixtures.errorEnvelope)
+            })
+        )
+
+        await viewModel.loadProfile(
+            token: "stale-token",
+            onUnauthorized: { await signal.fire() }
+        )
+
+        #expect(await signal.fired)
+        #expect(viewModel.profile == nil)
+    }
+
+    @Test func resetPreservesProfile() async throws {
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(),
+            client: StubHTTPClient(handler: { _ in
+                StubResponses.ok(Fixtures.authMe)
+            })
+        )
+
+        await viewModel.loadProfile(token: "test-token", onUnauthorized: {})
+        #expect(viewModel.profile != nil)
+
+        viewModel.reset()
+
+        // Profile is intentionally preserved across reset so tapping
+        // "Listen again" doesn't re-fetch.
+        #expect(viewModel.profile != nil)
+        #expect(viewModel.state == .idle)
+    }
+
+    // MARK: - Permission
+
+    @Test func checkPermissionReadsFromRecorder() async {
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(permissionStatus: .denied),
+            client: StubHTTPClient(handler: { _ in throw URLError(.unknown) })
+        )
+
+        viewModel.checkPermission()
+
+        #expect(viewModel.permissionStatus == .denied)
+    }
+
+    @Test func checkPermissionGrantedReflectsRecorderState() async {
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(permissionStatus: .granted),
+            client: StubHTTPClient(handler: { _ in throw URLError(.unknown) })
+        )
+
+        viewModel.checkPermission()
+
+        #expect(viewModel.permissionStatus == .granted)
+    }
+
+    @Test func resetPreservesPermissionStatus() async {
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(permissionStatus: .denied),
+            client: StubHTTPClient(handler: { _ in throw URLError(.unknown) })
+        )
+
+        viewModel.checkPermission()
+        #expect(viewModel.permissionStatus == .denied)
+
+        viewModel.reset()
+
+        // Permission status is intentionally preserved across reset.
+        // Resetting recording state doesn't undo the user's grant or deny.
+        #expect(viewModel.permissionStatus == .denied)
     }
 }
 
