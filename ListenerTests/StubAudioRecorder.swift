@@ -8,10 +8,10 @@
 import Foundation
 @testable import Listener
 
-/// Test stub for `AudioRecording`. Returns the canned audio data for any
-/// `record(duration:)` call and reports the configured permission status.
-/// The simulator has no microphone, so the real `AVAudioRecorderImpl` can
-/// never be unit-tested — view-model tests substitute this stub instead.
+/// Test stub for `AudioRecording`. Returns the canned audio data on `stop()`
+/// and reports the configured permission status. The simulator has no
+/// microphone, so the real `AVAudioRecorderImpl` can never be unit-tested
+/// — view-model tests substitute this stub instead.
 struct StubAudioRecorder: AudioRecording {
     let audio: Data
     let permissionStatus: AudioPermissionStatus
@@ -30,25 +30,43 @@ struct StubAudioRecorder: AudioRecording {
     }
 
     @MainActor
-    func record(duration: TimeInterval) async throws -> Data {
+    func start() async throws {
         if permissionStatus == .denied {
             throw AudioRecordingError.permissionDenied
         }
-        return audio
     }
+
+    @MainActor
+    func stop() async throws -> Data {
+        audio
+    }
+
+    @MainActor
+    func reset() {}
 }
 
-/// Test stub that always throws the supplied `AudioRecordingError`.
+/// Test stub that throws a configurable error from `start()` or `stop()`.
 /// Used by view-model tests to exercise error-handling branches.
+///
+/// `error:` (the legacy parameter from before the recorder was split into
+/// start/stop) is treated as `errorOnStart` by default for backwards
+/// compatibility with tests written against the previous protocol shape.
+/// Tests that need to fail at the `stop()` stage instead pass `errorOnStop:`.
 struct FailingAudioRecorder: AudioRecording {
-    let error: AudioRecordingError
     let permissionStatus: AudioPermissionStatus
+    let errorOnStart: AudioRecordingError?
+    let errorOnStop: AudioRecordingError?
 
     init(
-        error: AudioRecordingError,
+        error: AudioRecordingError? = nil,
+        errorOnStart: AudioRecordingError? = nil,
+        errorOnStop: AudioRecordingError? = nil,
         permissionStatus: AudioPermissionStatus = .granted
     ) {
-        self.error = error
+        // `error:` is the legacy parameter — treat as errorOnStart unless
+        // an explicit errorOnStart is provided.
+        self.errorOnStart = errorOnStart ?? error
+        self.errorOnStop = errorOnStop
         self.permissionStatus = permissionStatus
     }
 
@@ -58,7 +76,20 @@ struct FailingAudioRecorder: AudioRecording {
     }
 
     @MainActor
-    func record(duration: TimeInterval) async throws -> Data {
-        throw error
+    func start() async throws {
+        if let error = errorOnStart {
+            throw error
+        }
     }
+
+    @MainActor
+    func stop() async throws -> Data {
+        if let error = errorOnStop {
+            throw error
+        }
+        return Data()
+    }
+
+    @MainActor
+    func reset() {}
 }

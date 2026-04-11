@@ -14,12 +14,29 @@ import Foundation
 /// the iOS Simulator has no microphone, so the real `AVAudioRecorderImpl`
 /// can only be exercised on a physical device.
 ///
-/// `record(duration:)` is `@MainActor` because the production implementation
+/// All methods are `@MainActor` because the production implementation
 /// (`AVAudioRecorderImpl`) is bound to the main actor — it subclasses
 /// `NSObject` to conform to `AVAudioRecorderDelegate` and the delegate
 /// callbacks need to mutate main-actor-isolated state. Callers (the
 /// `ListenScreenViewModel` and friends) are themselves `@MainActor`, so
 /// the constraint is invisible at the call site.
+///
+/// **Three-method recording lifecycle**: the recorder is split into
+/// `start()`, `stop()`, and `reset()` so the duration timer can live in
+/// the view model rather than inside the recorder. This enables the
+/// "Stop early" feature — the view model can call `stop()` before the
+/// timer fires. The previous single-call `record(duration:)` shape made
+/// this impossible because the duration was hard-coded into the
+/// `AVAudioRecorder.record(forDuration:)` call and the continuation
+/// blocked until completion.
+///
+/// **`stop()` is `async throws`** because `AVAudioRecorder.stop()` does
+/// not guarantee the audio file is fully written and closed when it
+/// returns — code must wait for `audioRecorderDidFinishRecording(_:successfully:)`
+/// on the delegate before reading the file. The `withCheckedThrowingContinuation`
+/// bridge that used to span the entire `record(duration:)` call now lives
+/// inside `stop()` instead. Verified against Apple Developer Forums and
+/// Hacking with Swift on 2026-04-11.
 protocol AudioRecording: Sendable {
     /// Read the current microphone permission status without prompting
     /// the user. Synchronous because the underlying Apple property getter
@@ -31,11 +48,29 @@ protocol AudioRecording: Sendable {
     @MainActor
     func currentPermissionStatus() -> AudioPermissionStatus
 
-    /// Capture `duration` seconds of audio and return the encoded bytes.
-    /// Throws `AudioRecordingError` for any failure (permission denied,
-    /// session configuration, recording, file read).
+    /// Configure the audio session and start recording. Async because
+    /// the permission flow may need to prompt the user. Throws
+    /// `AudioRecordingError.permissionDenied` if the user declines, or
+    /// other `AudioRecordingError` cases on session/recorder setup failure.
+    /// Returns immediately after the recorder begins capturing — the view
+    /// model owns the duration timer and calls `stop()` to retrieve the
+    /// audio.
     @MainActor
-    func record(duration: TimeInterval) async throws -> Data
+    func start() async throws
+
+    /// Stop recording and return the captured audio bytes. Async because
+    /// it must wait for the `AVAudioRecorderDelegate` callback that
+    /// signals the file has been fully written and closed. Throws
+    /// `AudioRecordingError.recordingFailed` if `stop()` is called without
+    /// a prior successful `start()`, or if the delegate reports failure.
+    @MainActor
+    func stop() async throws -> Data
+
+    /// Tear down recorder state. Called after a successful or failed
+    /// recording cycle so the next `start()` begins from a clean state.
+    /// Idempotent.
+    @MainActor
+    func reset()
 }
 
 /// Microphone permission status, as reported by the underlying audio
@@ -106,7 +141,7 @@ final class AVAudioRecorderImpl: NSObject, AudioRecording {
         }
     }
 
-    func record(duration: TimeInterval) async throws -> Data {
+    func start() async throws {
         guard await ensureRecordPermission() else {
             throw AudioRecordingError.permissionDenied
         }
@@ -142,11 +177,27 @@ final class AVAudioRecorderImpl: NSObject, AudioRecording {
         avRecorder.delegate = self
         self.recorder = avRecorder
         self.fileURL = url
+        // No `forDuration:` — the view model owns the duration timer and
+        // calls `stop()` to end the recording. This is what enables the
+        // "Stop early" feature.
+        avRecorder.record()
+    }
 
+    func stop() async throws -> Data {
+        guard let recorder = self.recorder else {
+            throw AudioRecordingError.recordingFailed
+        }
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
-            avRecorder.record(forDuration: duration)
+            recorder.stop()
+            // The `audioRecorderDidFinishRecording` delegate callback fires
+            // next, which calls `handleFinish` to read the file and resume
+            // the continuation.
         }
+    }
+
+    func reset() {
+        cleanUp()
     }
 
     /// Returns `true` if the user has granted (or now grants) microphone

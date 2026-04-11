@@ -137,11 +137,30 @@ struct ListenScreen: View {
     }
 
     private var recordingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(2.0)
+        VStack(spacing: 24) {
+            ZStack {
+                Circle()
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+                Circle()
+                    .trim(from: 0, to: viewModel.recordingProgress)
+                    .stroke(
+                        LinearGradient.mixmatesBrand,
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 0.05), value: viewModel.recordingProgress)
+            }
+            .frame(width: 120, height: 120)
+
             Text("Listening…")
                 .font(.title3)
+
+            Button {
+                viewModel.stopRecording()
+            } label: {
+                Label("Stop early", systemImage: "stop.fill")
+            }
+            .buttonStyle(.bordered)
         }
     }
 
@@ -268,15 +287,36 @@ final class ListenScreenViewModel: ObservableObject {
     /// sibling's UX.
     @Published private(set) var permissionStatus: AudioPermissionStatus = .undetermined
 
+    /// Progress through the current recording, from `0.0` to `1.0`. Driven
+    /// by the timer task spawned inside `record()`. Used by the
+    /// `recordingView`'s circular progress ring. Reset to `0.0` at the
+    /// start of each recording.
+    @Published private(set) var recordingProgress: Double = 0.0
+
     private let audioRecorder: AudioRecording
     private let client: HTTPClient
+    private let recordingDuration: TimeInterval
+    private let sleep: @Sendable (Duration) async -> Void
+    private var recordingTask: Task<Void, Never>?
 
+    /// `recordingDuration` and `sleep` are injectable so unit tests can run
+    /// the timer loop in milliseconds rather than the production 11 seconds.
+    /// Tests pass a small duration (e.g. `0.05`) and a short real `sleep`
+    /// (e.g. `Task.sleep(for: .milliseconds(10))`) so the loop completes
+    /// in ~50ms wall clock. The closure-seam pattern matches the project's
+    /// existing `HTTPClient` protocol-seam approach for testable async code
+    /// (rather than the heavier `Clock` protocol from SE-0329, which would
+    /// require writing a custom `TestClock` since Apple doesn't ship one).
     init(
         audioRecorder: AudioRecording = AVAudioRecorderImpl(),
-        client: HTTPClient = URLSession.shared
+        client: HTTPClient = URLSession.shared,
+        recordingDuration: TimeInterval = 11.0,
+        sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }
     ) {
         self.audioRecorder = audioRecorder
         self.client = client
+        self.recordingDuration = recordingDuration
+        self.sleep = sleep
     }
 
     /// Fetch the signed-in user's profile from `auth/me` and store it.
@@ -315,6 +355,19 @@ final class ListenScreenViewModel: ObservableObject {
     /// listen key (read from `AuthState`) and an `onUnauthorized` closure
     /// that the underlying `ListenerAPI` invokes if the server returns 401
     /// — typically wired to `AuthState.signOut()`.
+    ///
+    /// The flow:
+    /// 1. Call `audioRecorder.start()` to begin capturing
+    /// 2. Spawn an internal `Task` that ticks every 50ms, updating
+    ///    `recordingProgress` until elapsed time reaches `recordingDuration`
+    ///    (or the task is cancelled by `stopRecording()`)
+    /// 3. Call `audioRecorder.stop()` to retrieve the audio
+    /// 4. Submit to `ListenerAPI.recognize` and update `state`
+    ///
+    /// `await`s the spawned task so callers (the view's button action,
+    /// tests) see the full flow complete in one call. The task handle is
+    /// stored on the view model so `stopRecording()` can cancel it from
+    /// outside the call site.
     func record(
         token: String,
         onUnauthorized: @Sendable @escaping () async -> Void
@@ -327,21 +380,76 @@ final class ListenScreenViewModel: ObservableObject {
             break
         }
 
-        state = .recording
-
-        let audio: Data
+        // Start the recorder. Failures here are setup failures (permission
+        // denied, session config) — they short-circuit before the timer
+        // loop even begins.
         do {
-            audio = try await audioRecorder.record(duration: 11)
+            try await audioRecorder.start()
         } catch AudioRecordingError.permissionDenied {
-            // Update permission state so the view re-renders to the
-            // permission-denied prompt instead of an error message.
-            // Returning to `.idle` (rather than `.error`) lets the
-            // `idleView` switch take over.
             self.permissionStatus = .denied
             self.state = .idle
             return
         } catch {
             state = .error(errorMessage(for: error))
+            return
+        }
+
+        state = .recording
+        recordingProgress = 0.0
+
+        // Spawn the timer task. The view model awaits its completion so
+        // the call returns when the full flow finishes (matches the test
+        // assertion pattern from the previous protocol shape).
+        let task = Task { @MainActor in
+            await self.runRecordingLoop()
+            await self.finishRecordingAndRecognise(
+                token: token,
+                onUnauthorized: onUnauthorized
+            )
+        }
+        self.recordingTask = task
+        await task.value
+        self.recordingTask = nil
+    }
+
+    /// "Stop early" action — cancel the running timer task. The loop sees
+    /// `Task.isCancelled` on its next tick and breaks out, then proceeds
+    /// to call `stop()` and submit normally. The user gets whatever audio
+    /// has been captured so far.
+    func stopRecording() {
+        recordingTask?.cancel()
+    }
+
+    /// 50ms tick loop. Updates `recordingProgress` until elapsed time
+    /// reaches `recordingDuration` or the task is cancelled. The loop
+    /// uses `Task.isCancelled` rather than throwing because we want
+    /// cancellation to fall through to `finishRecordingAndRecognise`,
+    /// not abandon the recording.
+    private func runRecordingLoop() async {
+        let startTime = Date()
+        while !Task.isCancelled {
+            await sleep(.milliseconds(50))
+            let elapsed = Date().timeIntervalSince(startTime)
+            self.recordingProgress = min(elapsed / recordingDuration, 1.0)
+            if elapsed >= recordingDuration {
+                break
+            }
+        }
+    }
+
+    /// Stop the recorder, retrieve the audio, submit to the API, update
+    /// `state` with the result. Always called after `runRecordingLoop`,
+    /// regardless of whether the loop exited via timer or cancellation.
+    private func finishRecordingAndRecognise(
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void
+    ) async {
+        let audio: Data
+        do {
+            audio = try await audioRecorder.stop()
+        } catch {
+            state = .error(errorMessage(for: error))
+            audioRecorder.reset()
             return
         }
 
@@ -364,6 +472,8 @@ final class ListenScreenViewModel: ObservableObject {
         } catch {
             state = .error(errorMessage(for: error))
         }
+
+        audioRecorder.reset()
     }
 
     /// Reset the recording state machine to `.idle` while preserving the
