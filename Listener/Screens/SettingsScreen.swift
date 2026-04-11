@@ -7,10 +7,13 @@
 
 import SwiftUI
 
-/// Settings screen. Two sections in an iOS-native `Form` layout:
+/// Settings screen. Three sections in an iOS-native `Form` layout:
 /// - **Appearance**: a single "Show splash screen" toggle, opt-out for the
 ///   1-second SwiftUI splash continuation that runs after the OS-level
 ///   `UILaunchScreen`. Default on.
+/// - **Legal**: a `NavigationLink` to `LegalScreen`, which holds the
+///   in-app trademark credit line, links to the web-hosted privacy and
+///   terms pages, and About info.
 /// - **Account**: the "Remove Listen Key" destructive action with a
 ///   confirmation alert, plus a brand footer crediting the app and linking
 ///   to the marketing site.
@@ -38,6 +41,10 @@ struct SettingsScreen: View {
                 Toggle("Show splash screen", isOn: $showSplashEnabled)
             } footer: {
                 Text("Show the MML logo briefly when the app opens. Turn off to skip straight to the listen screen.")
+            }
+
+            Section {
+                NavigationLink("Legal", destination: LegalScreen())
             }
 
             Section {
