@@ -18,14 +18,28 @@ This is a working app, but it's also a starting point. Fork it, restyle it, add 
 
 ## Make it your own
 
-This reference implementation covers the core flows — record, recognise, and browse your listen queue. There's plenty of room to build on top of it:
+This reference implementation covers the core flows — record, recognise, and browse your listen queue. There's plenty of room to build on top of it.
 
-- Design your own UI and branding
+**System integrations**
+
 - Add a Lock Screen or Home Screen widget for one-tap recognition
 - Build a Live Activity so recognition progress shows in the Dynamic Island
-- Add an Apple Watch companion to record from your wrist
 - Wire up a Siri App Intent — "Hey Siri, identify this song"
 - Build a Share Extension to recognise audio shared from other apps
+- Add an Apple Watch companion to record from your wrist
+
+**Offline and background**
+
+- Queue failed recognitions for retry when connectivity returns (SwiftData + BGTaskScheduler)
+- Background audio recognition — start listening from a notification or widget without opening the app
+- iCloud sync of listen history across devices
+
+**UI and experience**
+
+- Design your own UI and branding — the [wordmark package](assets/mml-wordmark/) is a starting point
+- Audio waveform visualisation during the recording countdown
+- Theme picker with light, dark, and system-follows modes
+- History search and filtering by date, artist, or platform availability
 
 Or take it in a completely different direction.
 
