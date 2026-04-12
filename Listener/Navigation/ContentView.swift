@@ -41,8 +41,21 @@ struct ContentView: View {
             if showSplashEnabled && !splashFinished {
                 SplashView()
                     .task {
-                        try? await Task.sleep(for: SplashView.duration)
-                        splashFinished = true
+                        // Hold the splash for the full duration. If the task
+                        // is cancelled (e.g. SwiftUI re-evaluates the view
+                        // identity for any reason), do NOT flip
+                        // `splashFinished` — that would prematurely transition
+                        // out of the splash and the user would see a flash
+                        // instead of the splash. Only flip on a clean
+                        // completion of the sleep.
+                        do {
+                            try await Task.sleep(for: SplashView.duration)
+                            splashFinished = true
+                        } catch {
+                            // Cancelled — leave `splashFinished` as-is. The
+                            // view is going away anyway, or it'll get a fresh
+                            // task on the next render.
+                        }
                     }
             } else if auth.token != nil {
                 NavigationStack {
