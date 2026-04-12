@@ -230,12 +230,13 @@ struct ListenScreenViewModelTests {
         // Wait for the loop to actually start ticking — polling
         // `recordingProgress > 0` proves the inner Task has been created,
         // assigned to `recordingTask`, and has executed at least one body
-        // iteration. A fixed sleep here is unsafe on slow CI runners
-        // where the MainActor scheduler can take >50ms to get the inner
-        // task running, leaving `recordingTask` still nil when we call
-        // stopRecording() and turning the cancel into a silent no-op.
+        // iteration. Each poll sleeps for 50ms rather than using
+        // `Task.yield()` because yield returns immediately on MainActor
+        // and can starve the recording task on congested CI runners —
+        // the polling loop re-acquires MainActor before the recording
+        // loop gets a chance to run its first 50ms tick.
         while viewModel.recordingProgress == 0.0 {
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(50))
         }
         viewModel.stopRecording()
 
