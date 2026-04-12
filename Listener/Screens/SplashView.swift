@@ -10,17 +10,18 @@ import SwiftUI
 /// Splash screen shown for at least 1 second after the OS-level
 /// `UILaunchScreen` finishes, when the user has not opted out via Settings.
 ///
-/// The OS launch screen handles the cold-start moment from icon-tap until
-/// the app process is ready (potentially milliseconds), then this view
-/// continues the brand experience for the remaining time so the user has
-/// a chance to register the splash. This is the standard iOS pattern for
-/// "minimum splash duration" — Apple Music, Twitter, and most major iOS
-/// apps that want a non-flash splash do it this way. There is no API to
-/// extend the OS launch screen itself.
-///
-/// Visually identical to `Assets.xcassets/LaunchLogo` on the
-/// `LaunchBackground` colour fill — the OS launch screen and this view are
-/// indistinguishable to the user, which is the point.
+/// The OS launch screen is intentionally **just the `LaunchBackground`
+/// colour**, no image — see `Info.plist`. The two-path design (OS launch
+/// screen with logo + SwiftUI splash with logo) was tried first but the
+/// OS launch screen's centred-at-native-point-size rendering didn't match
+/// the SwiftUI splash's `.frame + .fit` rendering, even when both pointed
+/// at the same asset, even with a 240×240 vector PDF that should have
+/// matched. Rather than fight `UILaunchScreen`'s opaque rendering rules,
+/// the launch screen is now a fast brand-colour flash and this SwiftUI
+/// view is the *only* surface that displays the logo. Many polished iOS
+/// apps work this way (Apple Music itself uses a solid-colour launch
+/// screen). The 1-second hold here gives the logo enough time to register
+/// before the main UI takes over.
 struct SplashView: View {
 
     /// How long the SwiftUI splash holds before transitioning to the real
@@ -31,11 +32,17 @@ struct SplashView: View {
         ZStack {
             Color("LaunchBackground")
                 .ignoresSafeArea()
-            Image("LaunchLogo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 240, height: 240)
-                .accessibilityLabel("MixMates Listener")
+            VStack(spacing: 20) {
+                Image("LaunchLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 320)
+                Text("Listener")
+                    .font(.custom("HelveticaNeue", size: 36))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("MixMates Listener")
         }
     }
 }

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="60" viewBox="0 0 240 60">
+  <defs>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1DB954"/>
+      <stop offset="100%" stop-color="#2CCCD3"/>
+    </linearGradient>
+  </defs>
+  <text x="50%" y="55.00" text-anchor="middle"
+        font-family="MuseoModerno" font-weight="700" fill="url(#brand)">
+    <tspan font-size="95.24">mm</tspan><tspan font-size="71.43">L</tspan>
+  </text>
+</svg>
