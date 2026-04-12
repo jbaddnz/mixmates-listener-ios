@@ -21,36 +21,17 @@ jobs:
           swift --version
           xcrun simctl list runtimes | grep iOS || true
 
-      - name: Pick latest iPhone simulator
-        id: simulator
-        run: |
-          # Find the newest available iPhone simulator on the runner.
-          # Avoids hardcoding a specific iPhone model that may not exist.
-          DEVICE=$(xcrun simctl list devices available --json \
-            | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          devices = []
-          for runtime, items in data['devices'].items():
-              if 'iOS' not in runtime:
-                  continue
-              for item in items:
-                  if 'iPhone' in item['name']:
-                      devices.append(item['udid'])
-          print(devices[-1] if devices else '')
-          ")
-          if [ -z "$DEVICE" ]; then
-            echo "No iPhone simulator found" >&2
-            exit 1
-          fi
-          echo "udid=$DEVICE" >> "$GITHUB_OUTPUT"
-
       - name: Build
         run: |
+          # iPhone 17 ships with Xcode 26 on macos-15 runners. Hardcoded
+          # because Xcode 26 only includes simulators for iPhone 16 and 17
+          # series — there's no risk of "model not found" on a supported
+          # runner, and if a future runner drops it the build fails clearly
+          # instead of silently falling back to an older device.
           xcodebuild build \
             -project Listener.xcodeproj \
             -scheme Listener \
-            -destination "id=${{ steps.simulator.outputs.udid }}"
+            -destination 'platform=iOS Simulator,name=iPhone 17'
 
       - name: Test
         run: |
@@ -62,5 +43,5 @@ jobs:
           xcodebuild test \
             -project Listener.xcodeproj \
             -scheme Listener \
-            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
             -only-testing:ListenerTests
