@@ -1,5 +1,7 @@
 # MixMates Listener for iOS
 
+[![CI](https://github.com/jbaddnz/mixmates-listener-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/jbaddnz/mixmates-listener-ios/actions/workflows/ci.yml)
+
 An open-source reference implementation of a music recognition app for iOS, built on the [MixMates Listener API](https://github.com/jbaddnz/mixmates-listener-api).
 
 Hold your iPhone up to a song, and it records a short clip, identifies the track, and gives you one-tap links to open it on Spotify, Tidal, or Apple Music. Think of it as an open, cross-platform Shazam — with the full source code in your hands.
