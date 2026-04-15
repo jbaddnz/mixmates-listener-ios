@@ -11,8 +11,16 @@ import Foundation
 
 struct RecognizeDTO: Decodable {
     let status: String
+    let historyId: String?
     let source: String?
     let track: TrackDTO?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case historyId = "history_id"
+        case source
+        case track
+    }
 }
 
 // MARK: - Domain
@@ -39,11 +47,13 @@ enum RecognitionStatus: Equatable {
 
 struct RecognitionResult: Equatable {
     let status: RecognitionStatus
+    let historyId: String?
     let source: String?
     let track: Track?
 
     init(dto: RecognizeDTO) {
         self.status = RecognitionStatus(rawValue: dto.status)
+        self.historyId = dto.historyId
         self.source = dto.source
         self.track = dto.track.map(Track.init(dto:))
     }

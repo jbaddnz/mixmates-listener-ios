@@ -196,6 +196,21 @@ struct ListenScreen: View {
                     .foregroundStyle(.secondary)
             }
 
+            if let historyId = result.historyId {
+                if viewModel.reported {
+                    Label("Reported", systemImage: "checkmark.circle")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button {
+                        Task { await reportWrong(historyId: historyId) }
+                    } label: {
+                        Label("Wrong", systemImage: "hand.thumbsdown")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+
             OpenInMixMatesButton()
                 .padding(.horizontal)
 
@@ -228,6 +243,15 @@ struct ListenScreen: View {
     private func record() async {
         guard let token = auth.token else { return }
         await viewModel.record(
+            token: token,
+            onUnauthorized: { @MainActor in auth.signOut() }
+        )
+    }
+
+    private func reportWrong(historyId: String) async {
+        guard let token = auth.token else { return }
+        await viewModel.reportWrong(
+            historyId: historyId,
             token: token,
             onUnauthorized: { @MainActor in auth.signOut() }
         )
@@ -284,6 +308,9 @@ final class ListenScreenViewModel: ObservableObject {
     /// `recordingView`'s circular progress ring. Reset to `0.0` at the
     /// start of each recording.
     @Published private(set) var recordingProgress: Double = 0.0
+
+    /// Whether the current recognition result has been reported as wrong.
+    @Published private(set) var reported = false
 
     private let audioRecorder: AudioRecording
     private let client: HTTPClient
@@ -486,6 +513,27 @@ final class ListenScreenViewModel: ObservableObject {
     /// should not re-fetch profile or re-check permission.
     func reset() {
         state = .idle
+        reported = false
+    }
+
+    func reportWrong(
+        historyId: String,
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void
+    ) async {
+        let api = ListenerAPI(
+            client: client,
+            tokenProvider: { token },
+            onUnauthorized: onUnauthorized
+        )
+        do {
+            try await api.reportHistory(id: historyId, reason: "wrong_match")
+            reported = true
+        } catch APIError.http(status: 409, _) {
+            reported = true
+        } catch {
+            // Best-effort — don't surface report failures to the user.
+        }
     }
 
     /// Read the current microphone permission status from the recorder

@@ -71,6 +71,10 @@ struct DeletedDTO: Decodable {
     let deleted: Bool
 }
 
+struct ReportedDTO: Decodable {
+    let reported: Bool
+}
+
 // MARK: - Domain
 
 struct HistoryList: Equatable {

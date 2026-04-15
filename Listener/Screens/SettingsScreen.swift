@@ -7,10 +7,7 @@
 
 import SwiftUI
 
-/// Settings screen. Four sections in an iOS-native `Form` layout:
-/// - **Appearance**: a single "Show splash screen" toggle, opt-out for the
-///   1-second SwiftUI splash continuation that runs after the OS-level
-///   `UILaunchScreen`. Default on.
+/// Settings screen. Three sections in an iOS-native `Form` layout:
 /// - **Legal**: a `NavigationLink` to `LegalScreen`, which holds the
 ///   in-app trademark credit line, links to the web-hosted privacy and
 ///   terms pages, and About info.
@@ -28,22 +25,20 @@ import SwiftUI
 ///   in-app deletion isn't possible. The brand footer hangs off this
 ///   bottom-most section.
 ///
-/// No view model — state is just the two alert visibilities (`@State`) and
-/// the splash preference (`@AppStorage`, shared with `ContentView`). The
-/// only async action is `auth.signOut()`, reached directly through the
+/// No view model — state is just the two alert visibilities (`@State`).
+/// The only async action is `auth.signOut()`, reached directly through the
 /// `AuthState` environment object. Adding a `SettingsViewModel` would be a
 /// one-line wrapper around existing operations, which the project's "no
 /// abstractions for one-time things" rule explicitly avoids.
 ///
-/// No display name / role / rate limit display — those live elsewhere
-/// (rate limit goes in the Listen screen toolbar). Matches the Android
-/// sibling's settings minimalism. There is no theme picker; see
-/// `docs/plans/proposed/theme-preference.md` (gitignored) for the rationale.
+/// No display name / role / rate limit display — those live elsewhere.
+/// Matches the Android sibling's settings minimalism. There is no theme
+/// picker; see `docs/plans/proposed/theme-preference.md` (gitignored) for
+/// the rationale.
 struct SettingsScreen: View {
 
     @EnvironmentObject private var auth: AuthState
     @Environment(\.openURL) private var openURL
-    @AppStorage("showSplashScreen") private var showSplashEnabled: Bool = true
     @State private var showRemoveConfirmation = false
     @State private var showDeleteAccountConfirmation = false
 
@@ -51,12 +46,6 @@ struct SettingsScreen: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle("Show splash screen", isOn: $showSplashEnabled)
-            } footer: {
-                Text("Show the MML logo briefly when the app opens. Turn off to skip straight to the listen screen.")
-            }
-
             Section {
                 NavigationLink("Legal", destination: LegalScreen())
             }

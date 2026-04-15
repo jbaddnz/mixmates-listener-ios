@@ -83,6 +83,17 @@ actor ListenerAPI {
         let _: DeletedDTO = try await request(path: "history/\(id)", method: "DELETE")
     }
 
+    func reportHistory(id: String, reason: String? = nil) async throws {
+        struct ReportBody: Encodable { let reason: String? }
+        let body = try JSONEncoder().encode(ReportBody(reason: reason))
+        let _: ReportedDTO = try await request(
+            path: "history/\(id)/report",
+            method: "POST",
+            body: body,
+            contentType: "application/json"
+        )
+    }
+
     func shareHistory(id: String, groupIds: [String]) async throws -> ShareOutcome {
         let body = try JSONEncoder().encode(ShareRequestDTO(groupIds: groupIds))
         let dto: ShareDataDTO = try await request(
