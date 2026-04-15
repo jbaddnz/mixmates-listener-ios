@@ -21,14 +21,14 @@ struct TokenEntryScreen: View {
             VStack(spacing: 8) {
                 Text("MixMates Listener")
                     .font(.largeTitle.weight(.semibold))
-                Text("Paste your Listen Key to get started.")
+                Text("Paste your pre-existing MixMates Listen key.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             VStack(spacing: 12) {
-                TextField("Listen Key", text: $key)
+                TextField("Paste Listener key", text: $key)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
@@ -61,11 +61,6 @@ struct TokenEntryScreen: View {
             .padding(.horizontal)
 
             Spacer()
-
-            Link("How to get a Listen Key",
-                 destination: URL(string: "https://mixmat.es/install")!)
-                .font(.footnote)
-                .padding(.bottom)
         }
         .padding()
         .animation(.default, value: viewModel.errorMessage)
