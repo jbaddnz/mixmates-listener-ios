@@ -61,6 +61,14 @@ struct ListenScreen: View {
             }
         }
         .toolbar {
+            if let rateLimit = viewModel.profile?.rateLimit {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Text("\(rateLimit.remaining)/\(rateLimit.limit)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("\(rateLimit.remaining) of \(rateLimit.limit) recognitions remaining")
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 NavigationLink {
                     HistoryScreen()
