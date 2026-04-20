@@ -128,6 +128,45 @@ struct ListenerAPITests {
         #expect(outcome.results.count == 2)
     }
 
+    @Test func resolvePostsJSONBodyWithURL() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.resolveSaved)
+        })
+        let result = try await api.resolve(url: URL(string: "https://open.spotify.com/track/abc")!)
+
+        #expect(captured.value?.httpMethod == "POST")
+        #expect(captured.value?.url?.path.hasSuffix("/resolve") == true)
+        #expect(captured.value?.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        #expect(result.status == .saved)
+        #expect(result.source == "link")
+        #expect(result.historyId == "h_99")
+        #expect(result.track?.title == "Prix choc")
+        #expect(result.track?.artist == "Etienne de Crécy")
+    }
+
+    @Test func resolveIncludesURLInBody() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.resolveSaved)
+        })
+        _ = try await api.resolve(url: URL(string: "https://open.spotify.com/intl-nz/track/abc")!)
+
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["url"] as? String == "https://open.spotify.com/intl-nz/track/abc")
+    }
+
+    @Test func resolveDuplicateReturnsDuplicateStatus() async throws {
+        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.resolveDuplicate) })
+        let result = try await api.resolve(url: URL(string: "https://tidal.com/browse/track/abc")!)
+
+        #expect(result.status == .duplicate)
+        #expect(result.historyId == "h_99")
+        #expect(result.track?.title == "Prix choc")
+    }
+
     @Test func recognizeUsesMultipartContentType() async throws {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
