@@ -226,6 +226,50 @@ enum Fixtures {
     { "data": { "deleted": 3 } }
     """#
 
+    static let resolveSaved = #"""
+    {
+      "data": {
+        "status": "saved",
+        "history_id": "h_99",
+        "source": "link",
+        "track": {
+          "title": "Prix choc",
+          "artist": "Etienne de Crécy",
+          "thumbnail": "https://img.example.com/prix-choc.jpg",
+          "shortcode": "pRiXcH0c",
+          "share_url": "https://mixmat.es/pRiXcH0c",
+          "platforms": {
+            "spotify": "https://open.spotify.com/track/prix",
+            "tidal": "https://tidal.com/browse/track/prix",
+            "appleMusic": "https://music.apple.com/us/album/prix"
+          }
+        }
+      }
+    }
+    """#
+
+    static let resolveDuplicate = #"""
+    {
+      "data": {
+        "status": "duplicate",
+        "history_id": "h_99",
+        "source": "link",
+        "track": {
+          "title": "Prix choc",
+          "artist": "Etienne de Crécy",
+          "thumbnail": "https://img.example.com/prix-choc.jpg",
+          "shortcode": "pRiXcH0c",
+          "share_url": "https://mixmat.es/pRiXcH0c",
+          "platforms": {
+            "spotify": "https://open.spotify.com/track/prix",
+            "tidal": "https://tidal.com/browse/track/prix",
+            "appleMusic": "https://music.apple.com/us/album/prix"
+          }
+        }
+      }
+    }
+    """#
+
     static let errorEnvelope = #"""
     {
       "error": {
