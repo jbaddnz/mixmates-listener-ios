@@ -105,6 +105,18 @@ actor ListenerAPI {
         return ShareOutcome(dto: dto)
     }
 
+    func resolve(url: URL) async throws -> RecognitionResult {
+        struct ResolveBody: Encodable { let url: String }
+        let body = try JSONEncoder().encode(ResolveBody(url: url.absoluteString))
+        let dto: RecognizeDTO = try await request(
+            path: "resolve",
+            method: "POST",
+            body: body,
+            contentType: "application/json"
+        )
+        return RecognitionResult(dto: dto)
+    }
+
     func groups() async throws -> [HumanGroup] {
         let dto: HumanGroupListDTO = try await request(path: "groups", method: "GET")
         return dto.items.map(HumanGroup.init(dto:))
