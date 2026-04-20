@@ -23,8 +23,13 @@ protocol TokenStorage: Sendable {
 }
 
 /// `Security` framework wrapper that stores the listen key as a generic
-/// password item. The service and account names are injectable so tests can
-/// isolate themselves from the production keychain entry.
+/// password item. The service, account, and access group are injectable so
+/// tests can isolate themselves from the production keychain entry.
+///
+/// When `accessGroup` is set to the App Group identifier
+/// (`group.es.mixmat.listener`), the keychain item is accessible to the
+/// Share Extension and any other target in the same App Group. Without an
+/// access group, items are private to the main app.
 final class KeychainManager: TokenStorage, @unchecked Sendable {
 
     enum KeychainError: Error, Equatable {
@@ -34,24 +39,25 @@ final class KeychainManager: TokenStorage, @unchecked Sendable {
 
     static let defaultService = "es.mixmat.listener.token"
     static let defaultAccount = "listen_key"
+    static let sharedAccessGroup = "27DK5QL8RX.es.mixmat.listener.shared"
 
     let service: String
     let account: String
+    let accessGroup: String?
 
     init(service: String = KeychainManager.defaultService,
-         account: String = KeychainManager.defaultAccount) {
+         account: String = KeychainManager.defaultAccount,
+         accessGroup: String? = nil) {
         self.service = service
         self.account = account
+        self.accessGroup = accessGroup
     }
 
     func get() throws -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        var query = baseQuery()
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         switch status {
@@ -76,13 +82,10 @@ final class KeychainManager: TokenStorage, @unchecked Sendable {
         // tolerates "not found" so this is safe on the first set as well.
         try removeIfPresent()
 
-        let attributes: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        ]
+        var attributes = baseQuery()
+        attributes[kSecValueData as String] = data
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw KeychainError.unexpectedStatus(status)
@@ -93,13 +96,44 @@ final class KeychainManager: TokenStorage, @unchecked Sendable {
         try removeIfPresent()
     }
 
-    private func removeIfPresent() throws {
-        let query: [String: Any] = [
+    /// Migrate a token from a non-shared keychain entry to this (shared)
+    /// instance. Call on app launch to ensure users upgrading from v1.0
+    /// (which stored the token without an access group) have their Listen
+    /// Key available to the Share Extension.
+    ///
+    /// No-op if this instance has no access group, if a token already exists
+    /// in the shared group, or if no token exists in the old location.
+    func migrateFromPrivateKeychain() throws {
+        guard accessGroup != nil else { return }
+        guard try get() == nil else { return }
+
+        let privateManager = KeychainManager(
+            service: service,
+            account: account,
+            accessGroup: nil
+        )
+        guard let existing = try privateManager.get() else { return }
+
+        try set(existing)
+        try privateManager.clear()
+    }
+
+    // MARK: - Private
+
+    private func baseQuery() -> [String: Any] {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        let status = SecItemDelete(query as CFDictionary)
+        if let accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+        return query
+    }
+
+    private func removeIfPresent() throws {
+        let status = SecItemDelete(baseQuery() as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.unexpectedStatus(status)
         }
