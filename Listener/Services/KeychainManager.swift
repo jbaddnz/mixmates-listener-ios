@@ -19,7 +19,7 @@ import Security
 protocol TokenStorage: Sendable {
     func get() throws -> String?
     func set(_ token: String) throws
-    func clear() throws
+    func clear() throws 
 }
 
 /// `Security` framework wrapper that stores the listen key as a generic

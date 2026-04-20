@@ -50,6 +50,12 @@ struct SettingsScreen: View {
                 NavigationLink("Legal", destination: LegalScreen())
             }
 
+            Section("Share Extension") {
+                Text("To pin MixMates Listener to the top of your share sheet, open the share sheet in any app, scroll right, tap More, then tap Edit and add MixMates Listener to your favourites.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Button(role: .destructive) {
                     showRemoveConfirmation = true
