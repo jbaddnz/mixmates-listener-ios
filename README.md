@@ -4,17 +4,17 @@
 
 An open-source reference implementation of a music recognition app for iOS, built on the [MixMates Listener API](https://github.com/jbaddnz/mixmates-listener-api).
 
-Hold your iPhone up to a song, and it records a short clip, identifies the track, and gives you one-tap links to open it on Spotify, Tidal, or Apple Music. Think of it as an open, cross-platform Shazam — with the full source code in your hands.
+Record a short clip of what's playing and get one-tap links to the track on Spotify, Tidal, and Apple Music. Share a link from any music app and get cross-platform links back. A complete iOS app built entirely with native Apple frameworks — no third-party dependencies.
 
-This is a working app, but it's also a starting point. Fork it, restyle it, add features, build something better. The API is documented, the code is MIT-licensed, and the architecture is intentionally straightforward.
+This is a working app, but it's also a learning resource. The architecture is intentionally straightforward, the code is MIT-licensed, and every pattern is documented. Fork it, study it, build on it.
 
 ## What it does
 
 - **Audio recognition** — 11-second recording, automatic identification via the MixMates API
-- **Cross-platform links** — Spotify, Tidal, and Apple Music deep links for every match
-- **Listen queue** — browse your recognition history with swipe-to-delete
+- **Cross-platform links** — Spotify, Tidal, and Apple Music links for every match
+- **Share Extension** — share a link from any music app and get cross-platform links back, with group sharing
+- **Listen history** — browse your recognition history with swipe-to-delete
 - **Permission-aware UI** — clear handling of mic permission states with a path to Settings
-- **Splash on/off** — Settings toggle for the launch animation
 
 ## Make it your own
 
@@ -25,7 +25,6 @@ This reference implementation covers the core flows — record, recognise, and b
 - Add a Lock Screen or Home Screen widget for one-tap recognition
 - Build a Live Activity so recognition progress shows in the Dynamic Island
 - Wire up a Siri App Intent — "Hey Siri, identify this song"
-- Build a Share Extension to recognise audio shared from other apps
 - Add an Apple Watch companion to record from your wrist
 
 **Offline and background**
@@ -76,7 +75,7 @@ A free Apple ID is enough to build and run on a physical device. An Apple Develo
 - **UI**: SwiftUI
 - **Architecture**: MVVM with `ObservableObject` and `@Published`
 - **Networking**: `URLSession` + `Codable`, single `actor` API client
-- **Local storage**: Keychain Services for the Listen key
+- **Local storage**: Keychain Services (shared between app and Share Extension)
 - **Image loading**: `AsyncImage`
 - **Dependency injection**: SwiftUI `Environment` + init injection
 - **Testing**: Swift Testing (`@Suite`, `@Test`, `#expect`)
