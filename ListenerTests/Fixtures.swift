@@ -270,6 +270,14 @@ enum Fixtures {
     }
     """#
 
+    static let pushRegistered = #"""
+    { "data": { "registered": true } }
+    """#
+
+    static let pushDeregistered = #"""
+    { "data": { "deregistered": true } }
+    """#
+
     static let errorEnvelope = #"""
     {
       "error": {

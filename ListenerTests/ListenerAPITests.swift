@@ -128,6 +128,34 @@ struct ListenerAPITests {
         #expect(outcome.results.count == 2)
     }
 
+    @Test func registerPushPostsDeviceToken() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.pushRegistered)
+        })
+        try await api.registerPush(deviceToken: "abc123def456")
+
+        #expect(captured.value?.httpMethod == "POST")
+        #expect(captured.value?.url?.path.hasSuffix("/push/register") == true)
+        #expect(captured.value?.value(forHTTPHeaderField: "Content-Type") == "application/json")
+
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["device_token"] as? String == "abc123def456")
+    }
+
+    @Test func deregisterPushUsesDeleteMethod() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.pushDeregistered)
+        })
+        try await api.deregisterPush()
+
+        #expect(captured.value?.httpMethod == "DELETE")
+        #expect(captured.value?.url?.path.hasSuffix("/push/register") == true)
+    }
+
     @Test func resolvePostsJSONBodyWithURL() async throws {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
