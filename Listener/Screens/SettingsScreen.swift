@@ -66,8 +66,15 @@ struct SettingsScreen: View {
                             Task { await pushManager.requestPermission() }
                         }
                     case .authorized:
-                        Label("Group notifications enabled", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                        HStack {
+                            Label("Group notifications enabled", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Spacer()
+                            Button("Manage") {
+                                openURL(URL(string: UIApplication.openSettingsURLString)!)
+                            }
+                            .font(.callout)
+                        }
                     case .denied:
                         Button("Enable in Settings") {
                             openURL(URL(string: UIApplication.openSettingsURLString)!)
