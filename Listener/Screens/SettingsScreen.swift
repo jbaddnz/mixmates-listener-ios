@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// Settings screen. Three sections in an iOS-native `Form` layout:
 /// - **Legal**: a `NavigationLink` to `LegalScreen`, which holds the
@@ -38,6 +39,7 @@ import SwiftUI
 struct SettingsScreen: View {
 
     @EnvironmentObject private var auth: AuthState
+    @EnvironmentObject private var pushManager: PushManager
     @Environment(\.openURL) private var openURL
     @State private var showRemoveConfirmation = false
     @State private var showDeleteAccountConfirmation = false
@@ -54,6 +56,30 @@ struct SettingsScreen: View {
                 Text("To pin MixMates Listener to the top of your share sheet, open the share sheet in any app, scroll right, tap More, then tap Edit and add MixMates Listener to your favourites.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Group {
+                    switch pushManager.permissionStatus {
+                    case .notDetermined:
+                        Button("Enable group notifications") {
+                            Task { await pushManager.requestPermission() }
+                        }
+                    case .authorized:
+                        Label("Group notifications enabled", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    case .denied:
+                        Button("Enable in Settings") {
+                            openURL(URL(string: UIApplication.openSettingsURLString)!)
+                        }
+                    default:
+                        EmptyView()
+                    }
+                }
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("Get notified when someone shares a track to your groups.")
             }
 
             Section {
@@ -83,7 +109,10 @@ struct SettingsScreen: View {
         .alert("Remove Listen Key?", isPresented: $showRemoveConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Remove", role: .destructive) {
-                auth.signOut()
+                Task {
+                    await pushManager.deregister()
+                    auth.signOut()
+                }
             }
         } message: {
             Text("You'll need to enter it again to use the app.")
