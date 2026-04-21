@@ -42,6 +42,10 @@ This reference implementation covers the core flows — record, recognise, and b
 
 Or take it in a completely different direction.
 
+## Try it
+
+Join the [TestFlight beta](https://testflight.apple.com/join/GsT78dHq) to try the app without building from source. You'll need a MixMates account with Listen enabled and a Listen Key.
+
 ## Getting started
 
 ### Requirements
