@@ -117,6 +117,27 @@ actor ListenerAPI {
         return RecognitionResult(dto: dto)
     }
 
+    func registerPush(deviceToken: String) async throws {
+        struct RegisterBody: Encodable {
+            let deviceToken: String
+            enum CodingKeys: String, CodingKey { case deviceToken = "device_token" }
+        }
+        let body = try JSONEncoder().encode(RegisterBody(deviceToken: deviceToken))
+        let _: PushRegisteredDTO = try await request(
+            path: "push/register",
+            method: "POST",
+            body: body,
+            contentType: "application/json"
+        )
+    }
+
+    func deregisterPush() async throws {
+        let _: PushDeregisteredDTO = try await request(
+            path: "push/register",
+            method: "DELETE"
+        )
+    }
+
     func groups() async throws -> [HumanGroup] {
         let dto: HumanGroupListDTO = try await request(path: "groups", method: "GET")
         return dto.items.map(HumanGroup.init(dto:))
