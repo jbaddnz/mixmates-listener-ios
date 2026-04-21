@@ -70,6 +70,7 @@
 				Models/Health.swift,
 				Models/HistoryItem.swift,
 				Models/HumanGroup.swift,
+				Models/PushRegistration.swift,
 				Models/RecognitionResult.swift,
 				Models/Recording.swift,
 				Models/ShareRequest.swift,
