@@ -49,14 +49,20 @@ struct RateLimitDTO: Decodable {
 // MARK: - Domain
 
 enum UserRole: Equatable {
+    case free
     case paid
+    case paidPlus
     case vip
+    case admin
     case other(String)
 
     init(rawValue: String) {
         switch rawValue {
+        case "free": self = .free
         case "paid": self = .paid
+        case "paid_plus": self = .paidPlus
         case "vip": self = .vip
+        case "admin": self = .admin
         default: self = .other(rawValue)
         }
     }
