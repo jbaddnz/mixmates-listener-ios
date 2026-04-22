@@ -217,9 +217,10 @@ struct ListenScreenViewModelTests {
     }
 
     @Test func stopRecordingShortCircuitsLoopAndSubmits() async throws {
-        // Use a longer recording duration so we have time to call
+        // Use a long recording duration so we have time to call
         // stopRecording() before the timer naturally completes.
-        let viewModel = makeViewModel(recordingDuration: 5.0)
+        // 30s gives ample margin even on congested CI runners.
+        let viewModel = makeViewModel(recordingDuration: 30.0)
 
         // Spawn record() in a separate task so we can call stopRecording()
         // from the test scope while it runs.
