@@ -168,7 +168,7 @@ struct DecodingTests {
     }
 
     @Test func unknownUserRoleBecomesOther() {
-        #expect(UserRole(rawValue: "admin") == .other("admin"))
+        #expect(UserRole(rawValue: "superuser") == .other("superuser"))
     }
 
     @Test func unknownShareStatusBecomesOther() {
