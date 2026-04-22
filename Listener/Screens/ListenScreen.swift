@@ -87,9 +87,8 @@ struct ListenScreen: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            Text("mixmat.es")
+            Link("mixmat.es", destination: URL(string: "https://mixmat.es")!)
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
                 .padding(.bottom, 8)
         }
     }
