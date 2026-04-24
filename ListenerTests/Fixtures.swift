@@ -270,6 +270,26 @@ enum Fixtures {
     }
     """#
 
+    static let appleAuthNewAccount = #"""
+    {
+      "data": {
+        "token": "encrypted-bearer-token",
+        "is_new_account": true,
+        "listen_enabled": false
+      }
+    }
+    """#
+
+    static let appleAuthExisting = #"""
+    {
+      "data": {
+        "token": "encrypted-bearer-token",
+        "is_new_account": false,
+        "listen_enabled": true
+      }
+    }
+    """#
+
     static let pushRegistered = #"""
     { "data": { "registered": true } }
     """#

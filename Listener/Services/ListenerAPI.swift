@@ -105,6 +105,34 @@ actor ListenerAPI {
         return ShareOutcome(dto: dto)
     }
 
+    func authenticateWithApple(identityToken: String, nonce: String, name: String?, email: String?) async throws -> AppleAuthResult {
+        struct UserInfo: Encodable {
+            let name: String?
+            let email: String?
+        }
+        struct AppleAuthBody: Encodable {
+            let identityToken: String
+            let nonce: String
+            let user: UserInfo?
+
+            enum CodingKeys: String, CodingKey {
+                case identityToken = "identity_token"
+                case nonce
+                case user
+            }
+        }
+        let user = (name != nil || email != nil) ? UserInfo(name: name, email: email) : nil
+        let body = try JSONEncoder().encode(AppleAuthBody(identityToken: identityToken, nonce: nonce, user: user))
+        let dto: AppleAuthDTO = try await request(
+            path: "auth/apple",
+            method: "POST",
+            body: body,
+            contentType: "application/json",
+            authenticated: false
+        )
+        return AppleAuthResult(dto: dto)
+    }
+
     func resolve(url: URL) async throws -> RecognitionResult {
         struct ResolveBody: Encodable { let url: String }
         let body = try JSONEncoder().encode(ResolveBody(url: url.absoluteString))
