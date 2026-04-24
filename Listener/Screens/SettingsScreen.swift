@@ -93,11 +93,11 @@ struct SettingsScreen: View {
                 Button(role: .destructive) {
                     showRemoveConfirmation = true
                 } label: {
-                    Text("Remove Listen Key")
+                    Text("Sign out")
                         .frame(maxWidth: .infinity)
                 }
             } footer: {
-                Text("Removes the key from this device. Your account at mixmat.es stays active.")
+                Text("Signs you out of this device. Your MixMates account stays active.")
             }
 
             Section {
@@ -113,16 +113,16 @@ struct SettingsScreen: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Remove Listen Key?", isPresented: $showRemoveConfirmation) {
+        .alert("Sign out?", isPresented: $showRemoveConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Remove", role: .destructive) {
+            Button("Sign out", role: .destructive) {
                 Task {
                     await pushManager.deregister()
                     auth.signOut()
                 }
             }
         } message: {
-            Text("You'll need to enter it again to use the app.")
+            Text("You'll need to sign in again to use the app.")
         }
         .alert("Delete your account?", isPresented: $showDeleteAccountConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -130,7 +130,7 @@ struct SettingsScreen: View {
                 openURL(Self.deleteAccountURL)
             }
         } message: {
-            Text("You'll be taken to mixmat.es to confirm. Deleting permanently removes your Listen Key, recognition history, and all associated data. This cannot be undone.")
+            Text("You'll be taken to mixmat.es to confirm. Deleting permanently removes your account, recognition history, and all associated data. This cannot be undone.")
         }
     }
 
