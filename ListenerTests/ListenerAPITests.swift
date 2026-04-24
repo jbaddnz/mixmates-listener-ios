@@ -128,6 +128,66 @@ struct ListenerAPITests {
         #expect(outcome.results.count == 2)
     }
 
+    @Test func authenticateWithApplePostsIdentityToken() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.appleAuthNewAccount)
+        })
+        let result = try await api.authenticateWithApple(
+            identityToken: "eyJ.test.token",
+            nonce: "abc123",
+            name: "Jamie Baddeley",
+            email: "jamie@example.com"
+        )
+
+        #expect(captured.value?.httpMethod == "POST")
+        #expect(captured.value?.url?.path.hasSuffix("/auth/apple") == true)
+        #expect(captured.value?.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(captured.value?.value(forHTTPHeaderField: "Content-Type") == "application/json")
+
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["identity_token"] as? String == "eyJ.test.token")
+        #expect(body?["nonce"] as? String == "abc123")
+        let user = body?["user"] as? [String: Any]
+        #expect(user?["name"] as? String == "Jamie Baddeley")
+        #expect(user?["email"] as? String == "jamie@example.com")
+
+        #expect(result.token == "encrypted-bearer-token")
+        #expect(result.isNewAccount == true)
+        #expect(result.listenEnabled == false)
+    }
+
+    @Test func authenticateWithAppleExistingAccount() async throws {
+        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.appleAuthExisting) })
+        let result = try await api.authenticateWithApple(
+            identityToken: "eyJ.test.token",
+            nonce: "abc123",
+            name: nil,
+            email: nil
+        )
+
+        #expect(result.isNewAccount == false)
+        #expect(result.listenEnabled == true)
+    }
+
+    @Test func authenticateWithAppleOmitsUserWhenNil() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.appleAuthExisting)
+        })
+        _ = try await api.authenticateWithApple(
+            identityToken: "eyJ.test.token",
+            nonce: "abc123",
+            name: nil,
+            email: nil
+        )
+
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["user"] == nil)
+    }
+
     @Test func registerPushPostsDeviceToken() async throws {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
