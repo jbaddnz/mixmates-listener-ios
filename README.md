@@ -10,9 +10,11 @@ This is a working app, but it's also a learning resource. The architecture is in
 
 ## What it does
 
+- **Sign in with Apple** — one-tap authentication, or paste a Listen Key if you already have one
 - **Audio recognition** — 11-second recording, automatic identification via the MixMates API
 - **Cross-platform links** — Spotify, Tidal, and Apple Music links for every match
 - **Share Extension** — share a link from any music app and get cross-platform links back, with group sharing
+- **Push notifications** — get notified when someone shares a track to your groups
 - **Listen history** — browse your recognition history with swipe-to-delete
 - **Permission-aware UI** — clear handling of mic permission states with a path to Settings
 
@@ -44,7 +46,7 @@ Or take it in a completely different direction.
 
 ## Try it
 
-Join the [TestFlight beta](https://testflight.apple.com/join/GsT78dHq) to try the app without building from source. You'll need a MixMates account with Listen enabled and a Listen Key.
+Join the [TestFlight beta](https://testflight.apple.com/join/GsT78dHq) to try the app without building from source. Sign in with Apple or paste an existing Listen Key.
 
 ## Getting started
 
@@ -52,8 +54,7 @@ Join the [TestFlight beta](https://testflight.apple.com/join/GsT78dHq) to try th
 
 - iOS 16.0 or higher
 - [Xcode](https://developer.apple.com/xcode/) 26 or higher
-- A [MixMates](https://mixmat.es) account with Listen enabled
-- A Listen Key (generated in MixMates Settings > Listening)
+- A [MixMates](https://mixmat.es) account with Listen enabled (or sign in with Apple to create one)
 
 A free Apple ID is enough to build and run on a physical device. An Apple Developer Program subscription is only needed for App Store distribution.
 
@@ -79,7 +80,9 @@ A free Apple ID is enough to build and run on a physical device. An Apple Develo
 - **UI**: SwiftUI
 - **Architecture**: MVVM with `ObservableObject` and `@Published`
 - **Networking**: `URLSession` + `Codable`, single `actor` API client
+- **Authentication**: Sign in with Apple (`AuthenticationServices`) + Listen Key fallback
 - **Local storage**: Keychain Services (shared between app and Share Extension)
+- **Push notifications**: APNs via `UserNotifications` + `UIApplicationDelegate` bridge
 - **Image loading**: `AsyncImage`
 - **Dependency injection**: SwiftUI `Environment` + init injection
 - **Testing**: Swift Testing (`@Suite`, `@Test`, `#expect`)
@@ -93,7 +96,7 @@ This app integrates with the [MixMates Listener API v1](https://github.com/jbadd
 
 This is an open-source client for a commercial API. The code is MIT-licensed and entirely yours to read, fork, and modify. The service behind the API is not — it runs on infrastructure that costs money to operate because we're serious about providing a good base for musical expression.
 
-What we can do is make everything around it open: the client code, the API specification, the documentation. You can see exactly what data leaves your device (an audio clip and a bearer token), exactly where it goes (mixmat.es), and exactly what comes back. There are no third-party SDKs in this app — no analytics, no tracking, no telemetry of any kind.
+What we can do is make everything around it open: the client code, the API specification, the documentation. You can see exactly what data leaves your device (an audio clip, an Apple identity token, or a bearer token), exactly where it goes (mixmat.es), and exactly what comes back. There are no third-party SDKs in this app — no analytics, no tracking, no telemetry of any kind.
 
 We think that's an honest trade-off, and we'd rather be upfront about it than pretend it isn't there.
 
