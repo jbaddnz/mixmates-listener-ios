@@ -224,7 +224,7 @@ final class TokenEntryViewModel: ObservableObject {
                 email: email
             )
             guard result.listenEnabled else {
-                errorMessage = "Listen isn't enabled for this account. Visit mixmat.es to upgrade."
+                errorMessage = "Listen isn't enabled for this account. Visit mixmat.es to turn it on."
                 return nil
             }
             return result.token
