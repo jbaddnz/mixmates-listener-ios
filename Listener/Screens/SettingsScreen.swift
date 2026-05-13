@@ -8,34 +8,24 @@
 import SwiftUI
 import UIKit
 
-/// Settings screen. Three sections in an iOS-native `Form` layout:
-/// - **Legal**: a `NavigationLink` to `LegalScreen`, which holds the
-///   in-app trademark credit line, links to the web-hosted privacy and
-///   terms pages, and About info.
-/// - **Sign out**: the "Remove Listen Key" destructive action with a
-///   confirmation alert. Local-only — clears the Keychain entry, the
-///   account at mixmat.es is untouched.
-/// - **Delete account**: a destructive action that, after confirmation,
-///   opens `mixmat.es/account/delete` in Safari. The web side renders the
-///   typed-confirmation modal directly on landing for authenticated users
-///   (or after sign-in for anonymous ones). Required by App Store Review
-///   Guideline 5.1.1(v) — apps that "support account creation" must offer
-///   in-app deletion. The Listener doesn't create accounts (paste-a-key
-///   model), but reviewers still flag the absence and Apple's account
-///   deletion guidance explicitly allows linking to a web URL when full
-///   in-app deletion isn't possible. The brand footer hangs off this
-///   bottom-most section.
+/// Settings screen, iOS-native `Form` layout. Sections ordered actions
+/// first, info/reference next, destructive account deletion at the very
+/// bottom:
+/// - **Account**: opens `AlternateAccountScreen` as a sheet for switching
+///   this device to a different MixMates account via Listen Key. Used for
+///   venue staff, event volunteers, or operators running multiple accounts
+///   on one device.
+/// - **Notifications**: push permission state and enable/manage controls.
+/// - **Sign out**: destructive, local-only — clears the Keychain entry,
+///   the account at mixmat.es is untouched.
+/// - **Share Extension**: a tip on pinning the extension in the share sheet.
+/// - **Legal**: navigates to `LegalScreen` (privacy, terms, trademarks,
+///   about, version).
+/// - **Delete account**: destructive, opens `mixmat.es/account/delete` in
+///   Safari. Required by App Store Review Guideline 5.1.1(v). The brand
+///   footer hangs off this bottom-most section.
 ///
-/// No view model — state is just the two alert visibilities (`@State`).
-/// The only async action is `auth.signOut()`, reached directly through the
-/// `AuthState` environment object. Adding a `SettingsViewModel` would be a
-/// one-line wrapper around existing operations, which the project's "no
-/// abstractions for one-time things" rule explicitly avoids.
-///
-/// No display name / role / rate limit display — those live elsewhere.
-/// Matches the Android sibling's settings minimalism. There is no theme
-/// picker; see `docs/plans/proposed/theme-preference.md` (gitignored) for
-/// the rationale.
+/// No view model — state is just the alert/sheet visibilities (`@State`).
 struct SettingsScreen: View {
 
     @EnvironmentObject private var auth: AuthState
@@ -43,19 +33,22 @@ struct SettingsScreen: View {
     @Environment(\.openURL) private var openURL
     @State private var showRemoveConfirmation = false
     @State private var showDeleteAccountConfirmation = false
+    @State private var showAlternateAccountSheet = false
 
     private static let deleteAccountURL = URL(string: "https://mixmat.es/account/delete")!
 
     var body: some View {
         Form {
             Section {
-                NavigationLink("Legal", destination: LegalScreen())
-            }
-
-            Section("Share Extension") {
-                Text("To pin MixMates Listener to the top of your share sheet, open the share sheet in any app, scroll right, tap More, then tap Edit and add MixMates Listener to your favourites.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Button {
+                    showAlternateAccountSheet = true
+                } label: {
+                    Text("Switch to another MixMates account")
+                }
+            } header: {
+                Text("Account")
+            } footer: {
+                Text("Switch this device to a different MixMates account using a Listen Key.")
             }
 
             Section {
@@ -100,6 +93,16 @@ struct SettingsScreen: View {
                 Text("Signs you out of this device. Your MixMates account stays active.")
             }
 
+            Section("Share Extension") {
+                Text("To pin MixMates Listener to the top of your share sheet, open the share sheet in any app, scroll right, tap More, then tap Edit and add MixMates Listener to your favourites.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                NavigationLink("Legal", destination: LegalScreen())
+            }
+
             Section {
                 Button(role: .destructive) {
                     showDeleteAccountConfirmation = true
@@ -107,8 +110,6 @@ struct SettingsScreen: View {
                     Text("Delete account")
                         .frame(maxWidth: .infinity)
                 }
-            } footer: {
-                brandFooter
             }
         }
         .navigationTitle("Settings")
@@ -132,27 +133,11 @@ struct SettingsScreen: View {
         } message: {
             Text("You'll be taken to mixmat.es to confirm. Deleting permanently removes your account, recognition history, and all associated data. This cannot be undone.")
         }
-    }
-
-    private var brandFooter: some View {
-        VStack(spacing: 4) {
-            Text("MixMates Listener")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Link("mixmat.es", destination: URL(string: "https://mixmat.es")!)
-                .font(.caption)
-            Text("MixMat Ltd")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-            Text("v\(appVersion)")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+        .sheet(isPresented: $showAlternateAccountSheet) {
+            AlternateAccountScreen()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 16)
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        .safeAreaInset(edge: .bottom) {
+            MixMatesLinkFooter()
+        }
     }
 }

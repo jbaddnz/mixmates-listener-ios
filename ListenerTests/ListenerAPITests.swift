@@ -60,7 +60,7 @@ struct ListenerAPITests {
         let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.authMe) })
         let profile = try await api.me()
         #expect(profile.displayName == "Jamie")
-        #expect(profile.role == .paid)
+        #expect(profile.role == "paid")
         #expect(profile.rateLimit?.remaining == 17)
     }
 

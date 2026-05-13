@@ -8,14 +8,14 @@
 import SwiftUI
 
 /// Root view. On launch, briefly shows `SplashView`, then switches between
-/// `TokenEntryScreen` (signed out) and a `NavigationStack` rooted at
+/// `SignInScreen` (signed out) and a `NavigationStack` rooted at
 /// `ListenScreen` (signed in) based on the observed `AuthState`. The auth
 /// state lives in the SwiftUI environment so child views can sign out
 /// without reaching back through navigation.
 ///
 /// When `AuthState.signOut()` flips `token` to `nil` (either explicitly from
 /// the Settings screen or automatically via the API client's 401 callback),
-/// the entire `NavigationStack` is discarded and replaced by `TokenEntryScreen`,
+/// the entire `NavigationStack` is discarded and replaced by `SignInScreen`,
 /// regardless of how deep the user had pushed. No manual pop logic needed —
 /// SwiftUI handles the unwinding by re-rendering the body.
 ///
@@ -53,7 +53,7 @@ struct ContentView: View {
                     ListenScreen()
                 }
             } else {
-                TokenEntryScreen()
+                SignInScreen()
             }
         }
         .animation(.default, value: splashFinished)

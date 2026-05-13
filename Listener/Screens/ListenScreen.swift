@@ -87,9 +87,7 @@ struct ListenScreen: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            Link("mixmat.es", destination: URL(string: "https://mixmat.es")!)
-                .font(.caption2)
-                .padding(.bottom, 8)
+            MixMatesLinkFooter()
         }
     }
 
@@ -378,7 +376,7 @@ final class ListenScreenViewModel: ObservableObject {
     }
 
     /// Drive the full record → recognise flow. Caller passes the current
-    /// listen key (read from `AuthState`) and an `onUnauthorized` closure
+    /// auth token (read from `AuthState`) and an `onUnauthorized` closure
     /// that the underlying `ListenerAPI` invokes if the server returns 401
     /// — typically wired to `AuthState.signOut()`.
     ///
