@@ -24,16 +24,18 @@ mml-wordmark/
 │   ├── MuseoModerno-Variable.ttf   variable font, weights 100-900
 │   └── OFL.txt                     SIL Open Font License 1.1
 ├── png/
-│   ├── mmL@1x.png   240×60      iOS asset @1x
-│   ├── mmL@2x.png   480×120     iOS asset @2x
-│   ├── mmL@3x.png   720×180     iOS asset @3x
-│   ├── mmL1024.png  1024×256    medium / web hero
-│   ├── mmL2048.png  2048×512    print / large display
-│   ├── mms@1x.png   240×60
-│   ├── mms@2x.png   480×120
-│   ├── mms@3x.png   720×180
-│   ├── mms1024.png  1024×256
-│   └── mms2048.png  2048×512
+│   ├── mmL@1x.png                240×60      iOS asset @1x
+│   ├── mmL@2x.png                480×120     iOS asset @2x
+│   ├── mmL@3x.png                720×180     iOS asset @3x
+│   ├── mmL1024.png               1024×256    medium / web hero
+│   ├── mmL2048.png               2048×512    print / large display
+│   ├── mms@1x.png                240×60
+│   ├── mms@2x.png                480×120
+│   ├── mms@3x.png                720×180
+│   ├── mms1024.png               1024×256
+│   ├── mms2048.png               2048×512
+│   └── listener-app-icon-1024.png  1024×1024 App Store icon: mmL +
+│                                              "Listener" on dark navy
 └── sources/
     ├── mmL.svg                  vector source — references MuseoModerno
     └── mms.svg                  by font-family, needs the bundled font
@@ -77,11 +79,34 @@ Then either:
 ## iOS-specific behaviour
 
 When `build.py` is run from inside the iOS repo
-(`mixmates-listener-ios/assets/mml-wordmark/`), it also writes the mmL
-PNGs into `Listener/Assets.xcassets/LaunchLogo.imageset/` and updates
-the `Contents.json` to declare them as @1x/@2x/@3x. Other consuming
-projects can ignore that step — the script silently skips it if the
-iOS asset directory doesn't exist alongside the package.
+(`mixmates-listener-ios/assets/mml-wordmark/`), it does two things on
+top of the standard package outputs:
+
+1. Writes the mmL PNGs into `Listener/Assets.xcassets/LaunchLogo.imageset/`
+   and updates `Contents.json` to declare them as @1x/@2x/@3x.
+2. Writes the 1024×1024 listener-app-icon into
+   `Listener/Assets.xcassets/AppIcon.appiconset/AppIcon.png` (a single
+   universal slot; modern Xcode generates smaller variants at build
+   time).
+
+Both steps are gated on the relevant asset-catalog directory existing
+relative to the script, so consuming projects without that exact iOS
+layout can run `build.py` and only get the standard `png/` and
+`sources/` outputs.
+
+## App icon notes
+
+The listener-app-icon composition is **Listener-specific** — it bakes
+"Listener" as the subtitle below the mmL wordmark. The config sits at
+the top of `build.py` (`APP_ICON_*` constants and the
+`render_app_icon(...)` invocation in `main()`). Other projects can
+adapt the subtitle and wordmark choice (e.g. mms for a future
+"MixMates Studio") or remove the app-icon block entirely.
+
+The subtitle uses Helvetica Neue, which is a system font on macOS. On
+other hosts the subtitle falls back to Pillow's default font — the
+app-icon output is intended to be regenerated on macOS for the
+canonical render.
 
 ## Regenerating the package
 
