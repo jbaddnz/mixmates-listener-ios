@@ -8,7 +8,7 @@
 import Foundation
 import Security
 
-/// Storage interface for the listen key. Abstracted as a protocol so tests
+/// Storage interface for the auth bearer token. Abstracted as a protocol so tests
 /// can substitute an in-memory implementation (`InMemoryTokenStorage`)
 /// without touching the real Keychain.
 ///
@@ -22,7 +22,7 @@ protocol TokenStorage: Sendable {
     func clear() throws 
 }
 
-/// `Security` framework wrapper that stores the listen key as a generic
+/// `Security` framework wrapper that stores the auth bearer token as a generic
 /// password item. The service, account, and access group are injectable so
 /// tests can isolate themselves from the production keychain entry.
 ///

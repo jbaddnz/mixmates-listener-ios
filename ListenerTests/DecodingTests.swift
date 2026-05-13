@@ -38,7 +38,7 @@ struct DecodingTests {
 
         #expect(profile.id == "u_abc123")
         #expect(profile.displayName == "Jamie")
-        #expect(profile.role == .paid)
+        #expect(profile.role == "paid")
         #expect(profile.listenEnabled == true)
         #expect(profile.preferredPlatform == "tidal")
 
@@ -165,10 +165,6 @@ struct DecodingTests {
 
     @Test func unknownRecognitionStatusBecomesOther() {
         #expect(RecognitionStatus(rawValue: "totally_new") == .other("totally_new"))
-    }
-
-    @Test func unknownUserRoleBecomesOther() {
-        #expect(UserRole(rawValue: "superuser") == .other("superuser"))
     }
 
     @Test func unknownShareStatusBecomesOther() {

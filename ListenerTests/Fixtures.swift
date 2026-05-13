@@ -312,7 +312,7 @@ enum Fixtures {
     """#
 
     /// `GET /auth/me` response for an account where Listen is not enabled.
-    /// Used by `TokenEntryViewModelTests` to verify the listen-disabled
+    /// Used by `AlternateAccountViewModelTests` to verify the listen-disabled
     /// branch of the verification flow.
     static let authMeListenDisabled = #"""
     {

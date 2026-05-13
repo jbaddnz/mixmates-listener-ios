@@ -48,30 +48,10 @@ struct RateLimitDTO: Decodable {
 
 // MARK: - Domain
 
-enum UserRole: Equatable {
-    case free
-    case paid
-    case paidPlus
-    case vip
-    case admin
-    case other(String)
-
-    init(rawValue: String) {
-        switch rawValue {
-        case "free": self = .free
-        case "paid": self = .paid
-        case "paid_plus": self = .paidPlus
-        case "vip": self = .vip
-        case "admin": self = .admin
-        default: self = .other(rawValue)
-        }
-    }
-}
-
 struct UserProfile: Equatable {
     let id: String
     let displayName: String
-    let role: UserRole
+    let role: String
     let listenEnabled: Bool
     let preferredPlatform: String?
     let rateLimit: RateLimit?
@@ -79,7 +59,7 @@ struct UserProfile: Equatable {
     init(dto: UserDTO) {
         self.id = dto.user.id
         self.displayName = dto.user.displayName
-        self.role = UserRole(rawValue: dto.user.role)
+        self.role = dto.user.role
         self.listenEnabled = dto.user.listenEnabled
         self.preferredPlatform = dto.user.preferredPlatform
         self.rateLimit = dto.rateLimit.map(RateLimit.init(dto:))

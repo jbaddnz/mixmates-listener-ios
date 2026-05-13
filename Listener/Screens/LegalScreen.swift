@@ -42,21 +42,23 @@ struct LegalScreen: View {
             }
 
             Section {
+                Text("MixMates Listener is a free standalone app designed to plug into the mixmat.es web service. It records audio, identifies songs, and shows public streaming links on Spotify, Tidal, and Apple Music.\n\nNo in-app purchases. No subscription prompts. Every authenticated user has the same features. Your MixMates account lives on the web at mixmat.es.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 LabeledContent("Version", value: versionString)
                 Link(
                     "Source code",
                     destination: URL(string: "https://github.com/jbaddnz/mixmates-listener-ios")!
                 )
             } header: {
-                Text("About")
-            } footer: {
-                Text("© \(currentYear) MixMat Ltd")
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 8)
+                Text("About MixMates Listener")
             }
         }
         .navigationTitle("Legal")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            MixMatesLinkFooter()
+        }
     }
 
     private var versionString: String {
@@ -64,14 +66,5 @@ struct LegalScreen: View {
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
         return "\(version) (\(build))"
-    }
-
-    /// Pulled fresh from `Calendar.current` on every render so the
-    /// copyright stays current without anyone needing to remember to
-    /// bump it on January 1. Returned as a `String` rather than `Int`
-    /// to avoid the locale-aware grouping separator that `Text`
-    /// interpolation would otherwise insert (e.g. "2,026").
-    private var currentYear: String {
-        String(Calendar.current.component(.year, from: Date()))
     }
 }
