@@ -1,24 +1,22 @@
 //
-//  TokenEntryViewModelTests.swift
+//  AlternateAccountViewModelTests.swift
 //  ListenerTests
 //
-//  Created by jamie baddeley on 11/04/2026.
+//  Created by jamie baddeley on 13/05/2026.
 //
 
 import Testing
 import Foundation
 @testable import Listener
 
-/// `@MainActor` because the system under test (`TokenEntryViewModel`) is
-/// `@MainActor`. Canned `(Data, HTTPURLResponse)` tuples come from the
-/// shared `StubResponses` namespace in `StubResponses.swift` — they live at
-/// file scope rather than as instance helpers because `StubHTTPClient`
-/// invokes its handler from the `ListenerAPI` actor's executor (not the
-/// main actor), and `@MainActor`-isolated instance methods would be
-/// unreachable from inside the `@Sendable` handler closure.
-@Suite("TokenEntryViewModel")
+/// `@MainActor` because the system under test (`AlternateAccountViewModel`)
+/// is `@MainActor`. Same `StubResponses` / `StubHTTPClient` plumbing as the
+/// other view-model tests — handlers are `@Sendable` and run off the main
+/// actor, so helpers stay at file scope rather than instance methods on a
+/// `@MainActor`-isolated test struct.
+@Suite("AlternateAccountViewModel")
 @MainActor
-struct TokenEntryViewModelTests {
+struct AlternateAccountViewModelTests {
 
     private let baseURL = StubResponses.url
 
@@ -26,8 +24,8 @@ struct TokenEntryViewModelTests {
 
     private func makeViewModel(
         handler: @escaping @Sendable (URLRequest) throws -> (Data, HTTPURLResponse)
-    ) -> TokenEntryViewModel {
-        TokenEntryViewModel(
+    ) -> AlternateAccountViewModel {
+        AlternateAccountViewModel(
             client: StubHTTPClient(handler: handler),
             baseURL: baseURL
         )
@@ -36,7 +34,7 @@ struct TokenEntryViewModelTests {
     /// Builds a view model whose `HTTPClient` will record an issue if any
     /// network request is made. Used for tests that exercise input
     /// validation paths that should short-circuit before hitting the API.
-    private func makeViewModelExpectingNoRequest() -> TokenEntryViewModel {
+    private func makeViewModelExpectingNoRequest() -> AlternateAccountViewModel {
         makeViewModel(handler: { _ in
             Issue.record("Network request was made when none was expected")
             throw URLError(.unknown)
@@ -121,4 +119,3 @@ struct TokenEntryViewModelTests {
         #expect(viewModel.errorMessage == "Couldn't verify the key. Try again.")
     }
 }
-

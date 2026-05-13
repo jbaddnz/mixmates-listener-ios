@@ -138,8 +138,8 @@ struct ShareView: View {
                 case .noAuth:
                     unavailableView(
                         "Not signed in",
-                        icon: "key",
-                        detail: "Open MixMates Listener and enter your Listen Key first."
+                        icon: "person.crop.circle.badge.exclamationmark",
+                        detail: "Open MixMates Listener and sign in first."
                     )
 
                 case .noURL:
