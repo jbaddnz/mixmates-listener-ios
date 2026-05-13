@@ -9,14 +9,27 @@ green → cyan).
 Outputs:
 - `png/mmL@1x.png` … `png/mmL-2048.png` — raster at 5 sizes
 - `png/mms@1x.png` … `png/mms-2048.png` — raster at 5 sizes
+- `png/listener-app-icon-1024.png` — square 1024×1024 app-icon-style
+  composition: dark navy background, mmL wordmark with brand gradient,
+  "Listener" subtitle in Helvetica Neue at 80% white. The same recipe
+  the iOS Listener target ships as its App Store icon.
 - `sources/mmL.svg`, `sources/mms.svg` — SVG with live text + tspan;
   consumers need MuseoModerno available at render time
 - (font + OFL license already in `fonts/`, not regenerated)
 
-Also writes iOS-specific @1x/@2x/@3x PNGs into the iOS LaunchLogo asset
-catalog if this script is run from the iOS repo (i.e. if the path
-`../../Listener/Assets.xcassets/LaunchLogo.imageset/` exists relative
-to the script). Other consuming projects can ignore that step.
+iOS-specific behaviour (only if this script is run from inside the iOS
+repo, i.e. if the relevant `Listener/Assets.xcassets/*.imageset/` or
+`AppIcon.appiconset/` directories exist relative to the script):
+- Writes mmL @1x/@2x/@3x PNGs into `LaunchLogo.imageset/`
+- Writes the listener app icon into `AppIcon.appiconset/AppIcon.png`
+
+Other consuming projects can ignore the iOS steps — the script silently
+skips them if the target directories don't exist.
+
+The "Listener" subtitle in the app icon uses Helvetica Neue, which is a
+system font on macOS. On non-macOS hosts the subtitle render falls back
+to Pillow's default font (functional but visually off); the app-icon
+output is intended to be regenerated on macOS.
 
 Usage:
     pip install Pillow
@@ -25,7 +38,10 @@ Usage:
 Designed to be portable. The script is self-contained: it only depends
 on Pillow and the bundled font in `fonts/`. Drop this whole `mml-wordmark/`
 folder into another mixmates project, run `python3 build.py`, and you
-get the same wordmarks rendered the same way.
+get the same wordmarks rendered the same way. The listener-specific app
+icon output stays in `png/` regardless — consuming projects can either
+adapt the config at the top of `main()` for their own subtitle/branding
+or skip the app-icon step entirely.
 """
 
 import shutil
@@ -38,9 +54,24 @@ PNG_DIR = SCRIPT_DIR / "png"
 SOURCES_DIR = SCRIPT_DIR / "sources"
 FONT_PATH = SCRIPT_DIR / "fonts" / "MuseoModerno-Variable.ttf"
 
-# Optional: iOS asset catalog target — relative to this script's location.
-# Only updated if it exists.
+# Optional: iOS asset catalog targets — relative to this script's location.
+# Only updated if the directory exists.
 IOS_LAUNCH_LOGO_DIR = SCRIPT_DIR.parent.parent / "Listener" / "Assets.xcassets" / "LaunchLogo.imageset"
+IOS_APP_ICON_DIR = SCRIPT_DIR.parent.parent / "Listener" / "Assets.xcassets" / "AppIcon.appiconset"
+
+# === App icon config (Listener-specific) ===
+# 1024×1024 square: dark navy bg, mmL wordmark with brand gradient,
+# "Listener" subtitle in Helvetica Neue at 80% white. The bg matches the
+# `LaunchBackground` color in the iOS asset catalog and the SplashView so
+# the launch→sign-in transition is seamless. Other consuming projects can
+# adapt or skip this section.
+APP_ICON_SIZE = 1024
+APP_ICON_BG = (26, 26, 46)              # #1A1A2E — matches LaunchBackground
+APP_ICON_WORDMARK_VISUAL_HEIGHT = 200    # m x-height = L cap-height = 200px
+APP_ICON_SUBTITLE = "Listener"
+APP_ICON_SUBTITLE_SIZE = 110
+APP_ICON_GAP = 50                        # vertical gap between wordmark and subtitle
+APP_ICON_SUBTITLE_FONT = "/System/Library/Fonts/HelveticaNeue.ttc"  # macOS-only
 
 # === Font config ===
 FONT_WEIGHT = 700  # MuseoModerno Bold
@@ -228,6 +259,87 @@ def generate_mms_svg() -> str:
 
 
 # ============================================================================
+# App icon rendering (Listener-specific)
+# ============================================================================
+
+def render_app_icon(
+    wordmark_chars: list,
+    wordmark_force_equal: bool,
+    subtitle: str,
+) -> Image.Image:
+    """Render a square app icon: dark `APP_ICON_BG` background, wordmark
+    (composed via the same primitives as the package's mmL/mms outputs)
+    with the brand gradient applied, plus a subtitle in Helvetica Neue at
+    80% white below.
+
+    The wordmark + subtitle stack is vertically centred. Horizontal
+    centring is per-element. The wordmark glyph composition (height-
+    matched mmL or natural mms) is controlled by `wordmark_force_equal`,
+    matching the same flag used by `render_wordmark_mask`.
+
+    Helvetica Neue is a macOS system font. On other hosts the subtitle
+    will fall back to Pillow's default font; regenerate on macOS for a
+    faithful render.
+    """
+    size = APP_ICON_SIZE
+    base = Image.new("RGB", (size, size), APP_ICON_BG)
+
+    # Render the wordmark mask at the target visual height
+    wm_mask = render_wordmark_mask(
+        wordmark_chars,
+        wordmark_force_equal,
+        APP_ICON_WORDMARK_VISUAL_HEIGHT,
+    )
+    wm_w = wm_mask.width
+    wm_h = wm_mask.height
+
+    # Measure the subtitle's text bounding box (without rendering yet)
+    try:
+        subtitle_font = ImageFont.truetype(APP_ICON_SUBTITLE_FONT, APP_ICON_SUBTITLE_SIZE)
+    except OSError:
+        # Fallback: Pillow's default bitmap font. Renders something usable
+        # on non-macOS hosts; regenerate on macOS for the canonical icon.
+        subtitle_font = ImageFont.load_default()
+    measure = ImageDraw.Draw(Image.new("L", (1, 1)))
+    sub_bbox = measure.textbbox((0, 0), subtitle, font=subtitle_font)
+    sub_w = sub_bbox[2] - sub_bbox[0]
+    sub_h = sub_bbox[3] - sub_bbox[1]
+
+    # Centre the [wordmark + gap + subtitle] stack vertically
+    total_h = wm_h + APP_ICON_GAP + sub_h
+    stack_top = (size - total_h) // 2
+
+    # Wordmark position (centred horizontally)
+    wm_x = (size - wm_w) // 2
+    wm_y = stack_top
+
+    # Subtitle position (centred horizontally, baseline-adjusted)
+    sub_x = (size - sub_w) // 2 - sub_bbox[0]
+    sub_y = stack_top + wm_h + APP_ICON_GAP - sub_bbox[1]
+
+    # Composite the wordmark: gradient applied through the wordmark mask.
+    # Full-canvas mask makes the gradient visible only inside the glyphs.
+    full_mask = Image.new("L", (size, size), 0)
+    full_mask.paste(wm_mask, (wm_x, wm_y))
+    gradient = make_horizontal_gradient_rgba(size, size).convert("RGB")
+    base.paste(gradient, (0, 0), full_mask)
+
+    # Draw the subtitle in white at 80% opacity via an RGBA overlay
+    overlay = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    overlay_draw.text(
+        (sub_x, sub_y),
+        subtitle,
+        font=subtitle_font,
+        fill=(255, 255, 255, 204),  # 80% alpha
+    )
+
+    base = base.convert("RGBA")
+    base = Image.alpha_composite(base, overlay)
+    return base.convert("RGB")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -248,6 +360,27 @@ def main() -> None:
     print(f"  sources/mmL.svg")
     (SOURCES_DIR / "mms.svg").write_text(generate_mms_svg())
     print(f"  sources/mms.svg")
+
+    # Render the Listener app icon (mmL wordmark + "Listener" subtitle on
+    # dark navy). Listener-specific output; other projects can adapt the
+    # config at the top of the file or remove this block.
+    app_icon = render_app_icon(
+        wordmark_chars=["m", "m", "L"],
+        wordmark_force_equal=True,
+        subtitle=APP_ICON_SUBTITLE,
+    )
+    app_icon_path = PNG_DIR / "listener-app-icon-1024.png"
+    app_icon.save(app_icon_path)
+    print(f"  {app_icon_path.relative_to(SCRIPT_DIR)}  ({app_icon.width}×{app_icon.height})")
+
+    # Wire up the iOS AppIcon asset if we're in the iOS repo. Only writes
+    # the 1024×1024 PNG; modern Xcode generates smaller variants at build
+    # time from this single source.
+    if IOS_APP_ICON_DIR.exists():
+        print(f"\nUpdating iOS AppIcon asset at {IOS_APP_ICON_DIR}")
+        dst = IOS_APP_ICON_DIR / "AppIcon.png"
+        app_icon.save(dst)
+        print(f"  {dst.relative_to(SCRIPT_DIR.parent.parent)}")
 
     # Wire up the iOS LaunchLogo asset if we're in the iOS repo
     if IOS_LAUNCH_LOGO_DIR.exists():

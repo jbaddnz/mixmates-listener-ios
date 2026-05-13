@@ -54,5 +54,3 @@ fastlane/test_output
 docs/
 CLAUDE.md
 
-# App icon render output (regeneratable from assets/render-icon.py)
-assets/mml-icon.png
