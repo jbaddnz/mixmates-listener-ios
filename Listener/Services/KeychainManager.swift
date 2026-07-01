@@ -38,6 +38,9 @@ final class KeychainManager: TokenStorage, @unchecked Sendable {
     }
 
     static let defaultService = "es.mixmat.listener.token"
+    // Legacy label from the Listen Key era. Preserved so existing installs
+    // stay signed in after the switch to SIWA-minted bearer tokens; renaming
+    // it would miss the keychain entry and force every user to sign in again.
     static let defaultAccount = "listen_key"
     static let sharedAccessGroup = "27DK5QL8RX.es.mixmat.listener.shared"
 

@@ -47,9 +47,6 @@ struct HistoryScreen: View {
         } message: { message in
             Text(message)
         }
-        .safeAreaInset(edge: .bottom) {
-            MixMatesLinkFooter()
-        }
     }
 
     // MARK: - Sub views

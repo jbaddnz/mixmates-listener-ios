@@ -10,7 +10,7 @@ This is a working app, but it's also a learning resource. The architecture is in
 
 ## What it does
 
-- **Sign in with Apple** — one-tap authentication; switch between MixMates accounts via Settings using a Listen Key
+- **Sign in with Apple** — one-tap authentication; a MixMates account is created on first sign-in if you don't already have one
 - **Audio recognition** — 11-second recording, automatic identification via the MixMates API
 - **Cross-platform links** — Spotify, Tidal, and Apple Music links for every match
 - **Share Extension** — share a link from any music app and get cross-platform links back, with group sharing
@@ -46,7 +46,7 @@ Or take it in a completely different direction.
 
 ## Try it
 
-Join the [TestFlight beta](https://testflight.apple.com/join/GsT78dHq) to try the app without building from source. Sign in with Apple to try it. If you have an existing Listen Key for a different account, switch to it from Settings.
+Join the [TestFlight beta](https://testflight.apple.com/join/GsT78dHq) to try the app without building from source. Sign in with Apple to try it — an account is created on first sign-in if you don't already have one.
 
 ## Getting started
 
@@ -54,7 +54,7 @@ Join the [TestFlight beta](https://testflight.apple.com/join/GsT78dHq) to try th
 
 - iOS 16.0 or higher
 - [Xcode](https://developer.apple.com/xcode/) 26 or higher
-- A [MixMates](https://mixmat.es) account with Listen enabled (or sign in with Apple to create one)
+- A free MixMates account — just sign in with Apple in the app (it creates one if you're new)
 
 A free Apple ID is enough to build and run on a physical device. An Apple Developer Program subscription is only needed for App Store distribution.
 
@@ -80,7 +80,7 @@ A free Apple ID is enough to build and run on a physical device. An Apple Develo
 - **UI**: SwiftUI
 - **Architecture**: MVVM with `ObservableObject` and `@Published`
 - **Networking**: `URLSession` + `Codable`, single `actor` API client
-- **Authentication**: Sign in with Apple (`AuthenticationServices`); multi-account switching via Listen Key in Settings
+- **Authentication**: Sign in with Apple (`AuthenticationServices`); bearer token issued by `/auth/apple` and stored in the Keychain
 - **Local storage**: Keychain Services (shared between app and Share Extension)
 - **Push notifications**: APNs via `UserNotifications` + `UIApplicationDelegate` bridge
 - **Image loading**: `AsyncImage`

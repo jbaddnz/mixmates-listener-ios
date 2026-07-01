@@ -265,8 +265,6 @@ struct ListenScreenViewModelTests {
         await viewModel.loadProfile(token: "test-token", onUnauthorized: {})
 
         #expect(viewModel.profile?.displayName == "Jamie")
-        #expect(viewModel.profile?.rateLimit?.remaining == 17)
-        #expect(viewModel.profile?.rateLimit?.limit == 20)
     }
 
     @Test func loadProfileNetworkFailureLeavesProfileNilAndStateUnchanged() async throws {

@@ -29,6 +29,13 @@ enum APIError: Error, Equatable {
     /// 502 Bad Gateway — recognition service (AudD) is currently down.
     case recognitionUnavailable
 
+    /// 403 with error code `group_locked` — a target group is in mastering
+    /// mode and the caller is not the creator / a co-creator. The group's
+    /// curator has frozen the tracklist; reactions and notes remain open
+    /// via the web app, but new tracks can only be added by the curator
+    /// team. Surfaced by `resolve` and `shareHistory`.
+    case groupLocked(payload: APIErrorPayload?)
+
     /// Any other non-2xx status with the parsed error envelope, if present.
     case http(status: Int, payload: APIErrorPayload?)
 
@@ -47,6 +54,8 @@ enum APIError: Error, Equatable {
             return lr == rr && lrem == rrem
         case (.recognitionUnavailable, .recognitionUnavailable):
             return true
+        case (.groupLocked(let l), .groupLocked(let r)):
+            return l == r
         case (.http(let ls, let lp), .http(let rs, let rp)):
             return ls == rs && lp == rp
         case (.unexpected(let l), .unexpected(let r)):

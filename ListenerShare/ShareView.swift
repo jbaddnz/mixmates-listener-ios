@@ -76,6 +76,8 @@ final class ShareViewModel: ObservableObject {
                 state = .noAuth
             case .network:
                 state = .error("No internet connection.")
+            case .groupLocked:
+                state = .error("This group is no longer accepting new tracks")
             case .http(_, let payload):
                 state = .error(payload?.message ?? "Couldn't resolve this link.")
             default:
@@ -108,6 +110,8 @@ final class ShareViewModel: ObservableObject {
                 groupIds: Array(selectedGroupIds)
             )
             shareResults = outcome.results
+        } catch APIError.groupLocked {
+            shareError = "This group is no longer accepting new tracks"
         } catch {
             shareError = "Couldn't share. Try again."
         }

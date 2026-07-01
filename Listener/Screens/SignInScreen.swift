@@ -75,9 +75,6 @@ struct SignInScreen: View {
             .padding()
         }
         .animation(.default, value: viewModel.errorMessage)
-        .safeAreaInset(edge: .bottom) {
-            MixMatesLinkFooter()
-        }
     }
 
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
@@ -165,10 +162,6 @@ final class SignInViewModel: ObservableObject {
                 name: name,
                 email: email
             )
-            guard result.listenEnabled else {
-                errorMessage = "Listen isn't enabled for this account. Visit mixmat.es to turn it on."
-                return nil
-            }
             return result.token
         } catch APIError.network {
             errorMessage = "Couldn't reach MixMates. Check your connection."
