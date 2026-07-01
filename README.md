@@ -4,7 +4,7 @@
 
 An open-source reference implementation of a music recognition app for iOS, built on the [MixMates Listener API](https://github.com/jbaddnz/mixmates-listener-api).
 
-Record a short clip of what's playing and get one-tap links to the track on Spotify, Tidal, and Apple Music. Share a link from any music app and get cross-platform links back. A complete iOS app built entirely with native Apple frameworks — no third-party dependencies.
+Record a short clip of what's playing and get one-tap links to the track on Spotify, Tidal, and Apple Music. Share a link from any music app and get cross-platform links back. Free to use, no in-app purchases. A complete iOS app built entirely with native Apple frameworks — no third-party dependencies.
 
 This is a working app, but it's also a learning resource. The architecture is intentionally straightforward, the code is MIT-licensed, and every pattern is documented. Fork it, study it, build on it.
 
@@ -16,6 +16,7 @@ This is a working app, but it's also a learning resource. The architecture is in
 - **Share Extension** — share a link from any music app and get cross-platform links back, with group sharing
 - **Push notifications** — get notified when someone shares a track to your groups
 - **Listen history** — browse your recognition history with swipe-to-delete
+- **In-app account deletion** — one-tap secure removal of your account and all associated data, no web handoff
 - **Permission-aware UI** — clear handling of mic permission states with a path to Settings
 
 ## Make it your own
