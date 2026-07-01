@@ -42,7 +42,7 @@ struct LegalScreen: View {
             }
 
             Section {
-                Text("MixMates Listener is a free standalone app designed to plug into the mixmat.es web service. It records audio, identifies songs, and shows public streaming links on Spotify, Tidal, and Apple Music.\n\nNo in-app purchases. No subscription prompts. Every authenticated user has the same features. Your MixMates account lives on the web at mixmat.es.")
+                Text("MixMates Listener is a free music-recognition app. It records audio, identifies songs, and shows public streaming links on Spotify, Tidal, and Apple Music.\n\nNo in-app purchases. No subscription prompts. Every authenticated user has the same features.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 LabeledContent("Version", value: versionString)
@@ -56,9 +56,6 @@ struct LegalScreen: View {
         }
         .navigationTitle("Legal")
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            MixMatesLinkFooter()
-        }
     }
 
     private var versionString: String {

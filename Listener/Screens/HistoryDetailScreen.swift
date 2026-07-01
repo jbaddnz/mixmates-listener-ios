@@ -15,7 +15,6 @@ import SwiftUI
 ///
 /// Layout follows the Android sibling's `HistoryDetailScreen.kt`:
 /// - `TrackCard` at the top (the same component used by `ListenScreen`)
-/// - "Open in MixMates" gradient deep-link button
 /// - Read-only "Shared to" section listing existing shares
 /// - "Share to groups" multi-select with per-group result strings after a
 ///   successful share
@@ -57,8 +56,6 @@ struct HistoryDetailScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 TrackCard(detail: detail)
-
-                OpenInMixMatesButton()
 
                 if !detail.sharedTo.isEmpty {
                     Divider()
@@ -303,6 +300,8 @@ final class HistoryDetailViewModel: ObservableObject {
             self.shareResults = outcome.results
         } catch APIError.unauthorized {
             // Already handled by callback.
+        } catch APIError.groupLocked {
+            self.errorMessage = "This group is no longer accepting new tracks"
         } catch {
             self.errorMessage = "Couldn't share — try again"
         }

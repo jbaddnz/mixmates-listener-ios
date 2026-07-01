@@ -41,11 +41,6 @@ struct DecodingTests {
         #expect(profile.role == "paid")
         #expect(profile.listenEnabled == true)
         #expect(profile.preferredPlatform == "tidal")
-
-        let rate = try #require(profile.rateLimit)
-        #expect(rate.limit == 20)
-        #expect(rate.remaining == 17)
-        #expect(rate.resetAt == Date(timeIntervalSince1970: 1709654400))
     }
 
     // MARK: - Recognition

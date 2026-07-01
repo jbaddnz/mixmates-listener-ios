@@ -25,11 +25,6 @@ enum Fixtures {
           "role": "paid",
           "listen_enabled": true,
           "preferred_platform": "tidal"
-        },
-        "rate_limit": {
-          "limit": 20,
-          "remaining": 17,
-          "reset_at": 1709654400
         }
       }
     }
@@ -275,7 +270,7 @@ enum Fixtures {
       "data": {
         "token": "encrypted-bearer-token",
         "is_new_account": true,
-        "listen_enabled": false
+        "listen_enabled": true
       }
     }
     """#
@@ -311,20 +306,4 @@ enum Fixtures {
     }
     """#
 
-    /// `GET /auth/me` response for an account where Listen is not enabled.
-    /// Used by `AlternateAccountViewModelTests` to verify the listen-disabled
-    /// branch of the verification flow.
-    static let authMeListenDisabled = #"""
-    {
-      "data": {
-        "user": {
-          "id": "u_xyz",
-          "display_name": "Test",
-          "role": "free",
-          "listen_enabled": false,
-          "preferred_platform": null
-        }
-      }
-    }
-    """#
 }

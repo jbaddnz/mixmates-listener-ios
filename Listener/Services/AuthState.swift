@@ -12,10 +12,9 @@ import Foundation
 /// changes to the injected `TokenStorage`. The root view observes this and
 /// switches between `SignInScreen` and `ListenScreen` accordingly.
 ///
-/// The token may be a Listen Key (pasted in the alternate-account flow) or a
-/// bearer token issued by `/auth/apple` after a Sign in with Apple
-/// authentication. The storage layer is intentionally agnostic to which —
-/// both flow through the same `Authorization: Bearer …` header.
+/// The token is a bearer token issued by `/auth/apple` after a Sign in with
+/// Apple authentication, sent as `Authorization: Bearer …` on every
+/// authenticated request.
 ///
 /// `import Combine` is required because Xcode 26's `MemberImportVisibility`
 /// upcoming feature no longer implicitly re-exports Combine through SwiftUI.

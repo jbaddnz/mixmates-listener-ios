@@ -181,6 +181,10 @@ actor ListenerAPI {
         return dto.deleted
     }
 
+    func deleteAccount() async throws {
+        let _: DeletedDTO = try await request(path: "account", method: "DELETE")
+    }
+
     // MARK: - Request plumbing
 
     /// Build the request, send it, and turn the response into either a decoded
@@ -232,6 +236,13 @@ actor ListenerAPI {
 
         case 502:
             throw APIError.recognitionUnavailable
+
+        case 403:
+            let payload = decodeErrorPayload(data)
+            if payload?.code == "group_locked" {
+                throw APIError.groupLocked(payload: payload)
+            }
+            throw APIError.http(status: http.statusCode, payload: payload)
 
         default:
             throw APIError.http(status: http.statusCode, payload: decodeErrorPayload(data))

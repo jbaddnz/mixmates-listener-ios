@@ -61,7 +61,6 @@ struct ListenerAPITests {
         let profile = try await api.me()
         #expect(profile.displayName == "Jamie")
         #expect(profile.role == "paid")
-        #expect(profile.rateLimit?.remaining == 17)
     }
 
     @Test func historySendsCursorAndLimitQueryItems() async throws {
@@ -155,7 +154,7 @@ struct ListenerAPITests {
 
         #expect(result.token == "encrypted-bearer-token")
         #expect(result.isNewAccount == true)
-        #expect(result.listenEnabled == false)
+        #expect(result.listenEnabled == true)
     }
 
     @Test func authenticateWithAppleExistingAccount() async throws {
@@ -214,6 +213,19 @@ struct ListenerAPITests {
 
         #expect(captured.value?.httpMethod == "DELETE")
         #expect(captured.value?.url?.path.hasSuffix("/push/register") == true)
+    }
+
+    @Test func deleteAccountUsesDeleteMethodAndSendsBearer() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(token: "key_xyz", handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.historyDelete)
+        })
+        try await api.deleteAccount()
+
+        #expect(captured.value?.httpMethod == "DELETE")
+        #expect(captured.value?.url?.path.hasSuffix("/account") == true)
+        #expect(captured.value?.value(forHTTPHeaderField: "Authorization") == "Bearer key_xyz")
     }
 
     @Test func resolvePostsJSONBodyWithURL() async throws {
@@ -327,6 +339,38 @@ struct ListenerAPITests {
             Issue.record("Expected recognition unavailable error")
         } catch APIError.recognitionUnavailable {
             // success
+        } catch {
+            Issue.record("Got wrong error: \(error)")
+        }
+    }
+
+    @Test func http403WithGroupLockedCodeBecomesGroupLockedError() async throws {
+        let api = makeAPI(handler: { _ in
+            StubResponses.http(403, body: #"{"error":{"code":"group_locked","message":"Group is in mastering mode"}}"#)
+        })
+
+        do {
+            _ = try await api.resolve(url: URL(string: "https://open.spotify.com/track/abc")!)
+            Issue.record("Expected groupLocked error")
+        } catch let APIError.groupLocked(payload) {
+            #expect(payload?.code == "group_locked")
+            #expect(payload?.message == "Group is in mastering mode")
+        } catch {
+            Issue.record("Got wrong error: \(error)")
+        }
+    }
+
+    @Test func http403WithOtherCodeFallsBackToGenericHTTPError() async throws {
+        let api = makeAPI(handler: { _ in
+            StubResponses.http(403, body: #"{"error":{"code":"not_found","message":"Not a member of target group"}}"#)
+        })
+
+        do {
+            _ = try await api.shareHistory(id: "h_1", groupIds: ["g1"])
+            Issue.record("Expected http error")
+        } catch let APIError.http(status, payload) {
+            #expect(status == 403)
+            #expect(payload?.code == "not_found")
         } catch {
             Issue.record("Got wrong error: \(error)")
         }

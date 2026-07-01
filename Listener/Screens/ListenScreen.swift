@@ -54,21 +54,12 @@ struct ListenScreen: View {
         .onChange(of: scenePhase) { newPhase in
             // Re-check permission when the user returns to the app — they
             // may have just gone to Settings to grant or revoke microphone
-            // access. Profile is not re-fetched because the rate limit only
-            // changes when the user records.
+            // access.
             if newPhase == .active {
                 viewModel.checkPermission()
             }
         }
         .toolbar {
-            if let rateLimit = viewModel.profile?.rateLimit {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Text("\(rateLimit.remaining)/\(rateLimit.limit)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("\(rateLimit.remaining) of \(rateLimit.limit) recognitions remaining")
-                }
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 NavigationLink {
                     HistoryScreen()
@@ -85,9 +76,6 @@ struct ListenScreen: View {
                 }
                 .accessibilityLabel("Settings")
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            MixMatesLinkFooter()
         }
     }
 
@@ -216,9 +204,6 @@ struct ListenScreen: View {
                 }
             }
 
-            OpenInMixMatesButton()
-                .padding(.horizontal)
-
             Button("Listen again") {
                 viewModel.reset()
             }
@@ -294,9 +279,8 @@ final class ListenScreenViewModel: ObservableObject {
     @Published private(set) var state: State = .idle
 
     /// Loaded once on screen appear via `loadProfile()`. Drives the
-    /// "Hi, $name" greeting and the rate limit indicator in the toolbar.
-    /// Preserved across `reset()` so tapping "Listen again" doesn't
-    /// re-fetch.
+    /// "Hi, $name" greeting. Preserved across `reset()` so tapping
+    /// "Listen again" doesn't re-fetch.
     @Published private(set) var profile: UserProfile?
 
     /// Microphone permission status, set proactively by `checkPermission()`
