@@ -22,7 +22,7 @@ enum Fixtures {
         "user": {
           "id": "u_abc123",
           "display_name": "Jamie",
-          "role": "paid",
+          "role": "listener",
           "listen_enabled": true,
           "preferred_platform": "tidal"
         }

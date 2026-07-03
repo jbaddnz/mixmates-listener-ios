@@ -38,7 +38,7 @@ struct DecodingTests {
 
         #expect(profile.id == "u_abc123")
         #expect(profile.displayName == "Jamie")
-        #expect(profile.role == "paid")
+        #expect(profile.role == "listener")
         #expect(profile.listenEnabled == true)
         #expect(profile.preferredPlatform == "tidal")
     }

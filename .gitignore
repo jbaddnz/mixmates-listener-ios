@@ -52,5 +52,6 @@ fastlane/test_output
 
 # Internal planning, drafts, and notes — not for the public repo
 docs/
+plans/
 CLAUDE.md
 

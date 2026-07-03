@@ -8,8 +8,9 @@
 import SwiftUI
 
 /// In-app legal copy area, pushed from Settings → Legal. Three sections:
-/// - **Policies**: links to the marketing-site-hosted Privacy Policy and
-///   Terms of Service. The web pages are the canonical source.
+/// - **Policies**: pushes native `PrivacyScreen` / `TermsScreen`. Their
+///   text is maintained inline; the app contains no outbound links to
+///   the MixMates website.
 /// - **Trademarks**: the Apple Music credit line required by section 9.2 of
 ///   the Apple Music Identity Guidelines, "wherever legal copy is shown."
 ///   Spotify and Tidal credit lines are deliberately deferred until the
@@ -25,14 +26,12 @@ struct LegalScreen: View {
     var body: some View {
         Form {
             Section("Policies") {
-                Link(
-                    "Privacy Policy",
-                    destination: URL(string: "https://mixmat.es/privacy")!
-                )
-                Link(
-                    "Terms of Service",
-                    destination: URL(string: "https://mixmat.es/terms")!
-                )
+                NavigationLink("Privacy Policy") {
+                    PrivacyScreen()
+                }
+                NavigationLink("Terms of Service") {
+                    TermsScreen()
+                }
             }
 
             Section("Trademarks") {
