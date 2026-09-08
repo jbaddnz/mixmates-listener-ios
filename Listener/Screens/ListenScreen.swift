@@ -303,22 +303,28 @@ final class ListenScreenViewModel: ObservableObject {
 
     private let audioRecorder: AudioRecording
     private let client: HTTPClient
-    private let recordingDuration: TimeInterval
+    private let recordingDuration: @Sendable () -> TimeInterval
     private let sleep: @Sendable (Duration) async -> Void
     private var recordingTask: Task<Void, Never>?
 
     /// `recordingDuration` and `sleep` are injectable so unit tests can run
-    /// the timer loop in milliseconds rather than the production 11 seconds.
-    /// Tests pass a small duration (e.g. `0.05`) and a short real `sleep`
-    /// (e.g. `Task.sleep(for: .milliseconds(10))`) so the loop completes
-    /// in ~50ms wall clock. The closure-seam pattern matches the project's
-    /// existing `HTTPClient` protocol-seam approach for testable async code
-    /// (rather than the heavier `Clock` protocol from SE-0329, which would
-    /// require writing a custom `TestClock` since Apple doesn't ship one).
+    /// the timer loop in milliseconds rather than the production 6–12
+    /// seconds. Tests pass a small duration (e.g. `{ 0.05 }`) and a short
+    /// real `sleep` (e.g. `Task.sleep(for: .milliseconds(10))`) so the loop
+    /// completes in ~50ms wall clock. The closure-seam pattern matches the
+    /// project's existing `HTTPClient` protocol-seam approach for testable
+    /// async code (rather than the heavier `Clock` protocol from SE-0329,
+    /// which would require writing a custom `TestClock` since Apple doesn't
+    /// ship one).
+    ///
+    /// `recordingDuration` is a closure, not a value, because the length is
+    /// a user preference (Settings → Recording): reading it when each
+    /// recording starts means a Settings change applies to the very next
+    /// tap, with no view-model rebuild.
     init(
         audioRecorder: AudioRecording = AVAudioRecorderImpl(),
         client: HTTPClient = URLSession.shared,
-        recordingDuration: TimeInterval = 11.0,
+        recordingDuration: @escaping @Sendable () -> TimeInterval = { TimeInterval(RecordingLength.seconds()) },
         sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }
     ) {
         self.audioRecorder = audioRecorder
@@ -447,12 +453,15 @@ final class ListenScreenViewModel: ObservableObject {
     /// cancellation to fall through to `finishRecordingAndRecognise`,
     /// not abandon the recording.
     private func runRecordingLoop() async {
+        // Read the preference once per recording — the ring and the cutoff
+        // must agree for the whole take even if Settings changes mid-way.
+        let duration = recordingDuration()
         let startTime = Date()
         while !Task.isCancelled {
             await sleep(.milliseconds(50))
             let elapsed = Date().timeIntervalSince(startTime)
-            self.recordingProgress = min(elapsed / recordingDuration, 1.0)
-            if elapsed >= recordingDuration {
+            self.recordingProgress = min(elapsed / duration, 1.0)
+            if elapsed >= duration {
                 break
             }
         }

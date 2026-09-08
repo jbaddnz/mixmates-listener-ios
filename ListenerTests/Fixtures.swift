@@ -265,7 +265,7 @@ enum Fixtures {
     }
     """#
 
-    static let appleAuthNewAccount = #"""
+    static let authNewAccount = #"""
     {
       "data": {
         "token": "encrypted-bearer-token",
@@ -275,7 +275,7 @@ enum Fixtures {
     }
     """#
 
-    static let appleAuthExisting = #"""
+    static let authExisting = #"""
     {
       "data": {
         "token": "encrypted-bearer-token",

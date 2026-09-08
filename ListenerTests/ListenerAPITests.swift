@@ -131,7 +131,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return StubResponses.ok(Fixtures.appleAuthNewAccount)
+            return StubResponses.ok(Fixtures.authNewAccount)
         })
         let result = try await api.authenticateWithApple(
             identityToken: "eyJ.test.token",
@@ -158,7 +158,7 @@ struct ListenerAPITests {
     }
 
     @Test func authenticateWithAppleExistingAccount() async throws {
-        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.appleAuthExisting) })
+        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.authExisting) })
         let result = try await api.authenticateWithApple(
             identityToken: "eyJ.test.token",
             nonce: "abc123",
@@ -174,7 +174,7 @@ struct ListenerAPITests {
         let captured = RequestCapture()
         let api = makeAPI(handler: { req in
             captured.set(req)
-            return StubResponses.ok(Fixtures.appleAuthExisting)
+            return StubResponses.ok(Fixtures.authExisting)
         })
         _ = try await api.authenticateWithApple(
             identityToken: "eyJ.test.token",
@@ -185,6 +185,61 @@ struct ListenerAPITests {
 
         let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         #expect(body?["user"] == nil)
+    }
+
+    @Test func authenticateWithGooglePostsIdToken() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.authNewAccount)
+        })
+        let result = try await api.authenticateWithGoogle(
+            idToken: "eyJ.google.token",
+            nonce: "xyz789",
+            name: "Jamie Baddeley"
+        )
+
+        #expect(captured.value?.httpMethod == "POST")
+        #expect(captured.value?.url?.path.hasSuffix("/auth/google") == true)
+        #expect(captured.value?.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(captured.value?.value(forHTTPHeaderField: "Content-Type") == "application/json")
+
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["id_token"] as? String == "eyJ.google.token")
+        #expect(body?["nonce"] as? String == "xyz789")
+        #expect(body?["name"] as? String == "Jamie Baddeley")
+
+        #expect(result.token == "encrypted-bearer-token")
+        #expect(result.isNewAccount == true)
+        #expect(result.listenEnabled == true)
+    }
+
+    @Test func authenticateWithGoogleExistingAccount() async throws {
+        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.authExisting) })
+        let result = try await api.authenticateWithGoogle(
+            idToken: "eyJ.google.token",
+            nonce: "xyz789",
+            name: nil
+        )
+
+        #expect(result.isNewAccount == false)
+        #expect(result.listenEnabled == true)
+    }
+
+    @Test func authenticateWithGoogleOmitsNameWhenNil() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.authExisting)
+        })
+        _ = try await api.authenticateWithGoogle(
+            idToken: "eyJ.google.token",
+            nonce: "xyz789",
+            name: nil
+        )
+
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["name"] == nil)
     }
 
     @Test func registerPushPostsDeviceToken() async throws {

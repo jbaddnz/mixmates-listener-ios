@@ -16,6 +16,17 @@ struct SignInScreen: View {
     @StateObject private var viewModel = SignInViewModel()
     @State private var currentNonce: String?
 
+    /// A successful sign-in that minted a brand-new account, held here until
+    /// the user decides whether to keep it. The token only enters `AuthState`
+    /// on "Keep this account" — a second account is never adopted silently.
+    @State private var pendingNewAccount: PendingSession?
+    @State private var showNewAccountAlert = false
+
+    private struct PendingSession {
+        let token: String
+        let method: SignInMethod
+    }
+
     var body: some View {
         ZStack {
             Color("LaunchBackground")
@@ -55,6 +66,20 @@ struct SignInScreen: View {
                     .signInWithAppleButtonStyle(.white)
                     .frame(height: 50)
 
+                    // Hidden until both Google client IDs are configured —
+                    // see GoogleOAuthConfiguration.current.
+                    if let googleConfiguration = GoogleOAuthConfiguration.current {
+                        GoogleSignInButton {
+                            Task { await handleGoogleSignIn(configuration: googleConfiguration) }
+                        }
+                    }
+
+                    if let lastMethod = auth.lastSignInMethod {
+                        Text("Last time you signed in with \(lastMethod.displayName).")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+
                     Text("Free • No in-app purchases")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.6))
@@ -75,6 +100,35 @@ struct SignInScreen: View {
             .padding()
         }
         .animation(.default, value: viewModel.errorMessage)
+        .alert(
+            "New MixMates account created",
+            isPresented: $showNewAccountAlert,
+            presenting: pendingNewAccount
+        ) { pending in
+            Button("Sign out", role: .destructive) {
+                pendingNewAccount = nil
+            }
+            Button("Keep this account") {
+                auth.setToken(pending.token, method: pending.method)
+                pendingNewAccount = nil
+            }
+        } message: { _ in
+            Text("There was no MixMates account for this sign-in, so we made a new one. Already have an account — maybe with Apple, or another Google account? Sign out and use that instead.")
+        }
+    }
+
+    /// Adopt a successful sign-in — immediately when the account already
+    /// existed, or via the new-account alert when the server just created
+    /// one (the fork tripwire: a person with an existing account under the
+    /// other provider should get the chance to back out and use that
+    /// instead).
+    private func adopt(_ result: AuthResult, method: SignInMethod) {
+        if result.isNewAccount {
+            pendingNewAccount = PendingSession(token: result.token, method: method)
+            showNewAccountAlert = true
+        } else {
+            auth.setToken(result.token, method: method)
+        }
     }
 
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
@@ -96,13 +150,13 @@ struct SignInScreen: View {
 
             let email = credential.email
 
-            if let token = await viewModel.signInWithApple(
+            if let result = await viewModel.signInWithApple(
                 identityToken: identityToken,
                 nonce: nonce,
                 name: name,
                 email: email
             ) {
-                auth.setToken(token)
+                adopt(result, method: .apple)
             }
 
         case .failure:
@@ -110,9 +164,32 @@ struct SignInScreen: View {
             break
         }
     }
+
+    private func handleGoogleSignIn(configuration: GoogleOAuthConfiguration) async {
+        // Fresh nonce per attempt — the server replay-guards it (single-use,
+        // 5-minute window), so retries must never reuse one.
+        let nonce = UUID().uuidString
+        let service = GoogleSignInService(configuration: configuration)
+        do {
+            let signIn = try await service.signIn(nonce: nonce)
+            if let result = await viewModel.signInWithGoogle(
+                idToken: signIn.idToken,
+                nonce: nonce,
+                name: signIn.displayName
+            ) {
+                adopt(result, method: .google)
+            }
+        } catch GoogleSignInError.cancelled {
+            // User backed out of the Google sheet — silent, matching the
+            // Apple-cancel path above.
+        } catch {
+            viewModel.errorMessage = "Couldn't complete Google sign-in. Try again."
+        }
+    }
 }
 
-/// View model for `SignInScreen`. Handles Sign in with Apple authentication.
+/// View model for `SignInScreen`. Handles Sign in with Apple and Sign in
+/// with Google authentication against the Listener API.
 ///
 /// `@MainActor` because it drives a SwiftUI view. `ObservableObject` rather
 /// than `@Observable` because the project's deployment target is iOS 16,
@@ -137,14 +214,46 @@ final class SignInViewModel: ObservableObject {
     }
 
     /// Authenticate via Sign in with Apple. Sends the identity token and
-    /// nonce to the server, receives a bearer token. Returns the token on
-    /// success, or `nil` if sign-in failed (with `errorMessage` set).
+    /// nonce to the server, receives a bearer token. Returns the full
+    /// `AuthResult` on success — the view needs `isNewAccount` for the fork
+    /// tripwire — or `nil` if sign-in failed (with `errorMessage` set).
     func signInWithApple(
         identityToken: String,
         nonce: String,
         name: String?,
         email: String?
-    ) async -> String? {
+    ) async -> AuthResult? {
+        await authenticate {
+            try await $0.authenticateWithApple(
+                identityToken: identityToken,
+                nonce: nonce,
+                name: name,
+                email: email
+            )
+        }
+    }
+
+    /// Authenticate via Sign in with Google. Sends the Google ID token and
+    /// the same raw nonce that went into the Google sign-in request. Returns
+    /// the full `AuthResult` on success or `nil` on failure (with
+    /// `errorMessage` set).
+    func signInWithGoogle(
+        idToken: String,
+        nonce: String,
+        name: String?
+    ) async -> AuthResult? {
+        await authenticate {
+            try await $0.authenticateWithGoogle(
+                idToken: idToken,
+                nonce: nonce,
+                name: name
+            )
+        }
+    }
+
+    private func authenticate(
+        _ call: (ListenerAPI) async throws -> AuthResult
+    ) async -> AuthResult? {
         isVerifying = true
         errorMessage = nil
         defer { isVerifying = false }
@@ -156,13 +265,7 @@ final class SignInViewModel: ObservableObject {
         )
 
         do {
-            let result = try await api.authenticateWithApple(
-                identityToken: identityToken,
-                nonce: nonce,
-                name: name,
-                email: email
-            )
-            return result.token
+            return try await call(api)
         } catch APIError.network {
             errorMessage = "Couldn't reach MixMates. Check your connection."
         } catch APIError.rateLimited {

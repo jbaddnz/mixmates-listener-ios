@@ -67,7 +67,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Models/APIEnvelope.swift,
-				Models/AppleAuth.swift,
+				Models/Auth.swift,
 				Models/Health.swift,
 				Models/HistoryItem.swift,
 				Models/HumanGroup.swift,

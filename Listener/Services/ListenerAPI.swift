@@ -105,7 +105,7 @@ actor ListenerAPI {
         return ShareOutcome(dto: dto)
     }
 
-    func authenticateWithApple(identityToken: String, nonce: String, name: String?, email: String?) async throws -> AppleAuthResult {
+    func authenticateWithApple(identityToken: String, nonce: String, name: String?, email: String?) async throws -> AuthResult {
         struct UserInfo: Encodable {
             let name: String?
             let email: String?
@@ -123,14 +123,42 @@ actor ListenerAPI {
         }
         let user = (name != nil || email != nil) ? UserInfo(name: name, email: email) : nil
         let body = try JSONEncoder().encode(AppleAuthBody(identityToken: identityToken, nonce: nonce, user: user))
-        let dto: AppleAuthDTO = try await request(
+        let dto: AuthResultDTO = try await request(
             path: "auth/apple",
             method: "POST",
             body: body,
             contentType: "application/json",
             authenticated: false
         )
-        return AppleAuthResult(dto: dto)
+        return AuthResult(dto: dto)
+    }
+
+    /// Exchange a Google ID token for a MixMates bearer token. The `nonce`
+    /// must be the same raw value that was passed into the Google sign-in
+    /// request (the server replay-guards it: single-use, 5-minute window),
+    /// and must be freshly generated for every attempt. `name` is sent only
+    /// when Google's ID token carried one — the claim is never guaranteed.
+    func authenticateWithGoogle(idToken: String, nonce: String, name: String?) async throws -> AuthResult {
+        struct GoogleAuthBody: Encodable {
+            let idToken: String
+            let nonce: String
+            let name: String?
+
+            enum CodingKeys: String, CodingKey {
+                case idToken = "id_token"
+                case nonce
+                case name
+            }
+        }
+        let body = try JSONEncoder().encode(GoogleAuthBody(idToken: idToken, nonce: nonce, name: name))
+        let dto: AuthResultDTO = try await request(
+            path: "auth/google",
+            method: "POST",
+            body: body,
+            contentType: "application/json",
+            authenticated: false
+        )
+        return AuthResult(dto: dto)
     }
 
     func resolve(url: URL) async throws -> RecognitionResult {

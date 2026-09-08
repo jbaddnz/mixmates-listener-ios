@@ -7,9 +7,9 @@
 
         Required by Apple since spring 2024 for any app that uses Required
         Reason APIs or third-party SDKs. We have no third-party SDKs, so
-        the only declaration needed is the UserDefaults usage from
-        @AppStorage in SettingsScreen and ContentView (the splash toggle
-        preference).
+        the only declaration needed is UserDefaults: the last-sign-in-method
+        hint written by AuthState and the recording-length preference from
+        @AppStorage in SettingsScreen.
 
         Tracking is false because the app does no tracking of any kind:
         no analytics, no advertising, no IDFA, no third-party telemetry.
@@ -34,8 +34,9 @@
                 <!--
                     CA92.1: Access info from same app, app extensions,
                     and App Clips that are members of the same App Group.
-                    The "showSplashScreen" preference is set and read by
-                    the app itself only — no extensions, no app group
+                    The "lastSignInMethod" hint and the
+                    "recordingDurationSeconds" preference are set and read
+                    by the app itself only — no extensions, no app group
                     sharing, no other readers.
                 -->
                 <string>CA92.1</string>

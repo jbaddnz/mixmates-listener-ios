@@ -49,8 +49,27 @@ struct ListenScreenViewModelTests {
         ListenScreenViewModel(
             audioRecorder: audioRecorder,
             client: StubHTTPClient(handler: handler),
-            recordingDuration: recordingDuration
+            recordingDuration: { recordingDuration }
         )
+    }
+
+    // MARK: - Recording duration preference
+
+    /// The duration closure must be consulted at the start of every
+    /// recording — that's what makes a Settings change (Recording → Length)
+    /// apply to the very next take without rebuilding the view model.
+    @Test func durationIsReadFreshForEachRecording() async {
+        let reads = CallCounter()
+        let viewModel = ListenScreenViewModel(
+            audioRecorder: StubAudioRecorder(),
+            client: StubHTTPClient(handler: { _ in StubResponses.ok(Fixtures.recognizeSaved) }),
+            recordingDuration: { reads.increment(); return 0.05 }
+        )
+
+        await viewModel.record(token: "test-token", onUnauthorized: {})
+        await viewModel.record(token: "test-token", onUnauthorized: {})
+
+        #expect(reads.value == 2)
     }
 
     // MARK: - Success path
@@ -357,4 +376,22 @@ struct ListenScreenViewModelTests {
 private actor UnauthorizedSignal {
     private(set) var fired = false
     func fire() { fired = true }
+}
+
+/// Thread-safe call counter for `@Sendable` closure seams.
+private final class CallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
+    }
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
 }

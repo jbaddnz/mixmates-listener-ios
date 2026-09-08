@@ -12,6 +12,7 @@ import UIKit
 /// Settings screen, iOS-native `Form` layout. Sections ordered actions
 /// first, info/reference next, destructive account deletion at the very
 /// bottom:
+/// - **Recording**: stepper for the recording length (6–12 s, default 10).
 /// - **Notifications**: push permission state and enable/manage controls.
 /// - **Sign out**: destructive, local-only — clears the Keychain entry.
 /// - **Share Extension**: a tip on pinning the extension in the share sheet.
@@ -30,8 +31,28 @@ struct SettingsScreen: View {
     @State private var showDeleteAccountConfirmation = false
     @State private var showDeleteErrorAlert = false
 
+    /// Backed by the same UserDefaults key `ListenScreenViewModel` reads at
+    /// the start of each recording, so changes here apply to the next tap
+    /// of the record button.
+    @AppStorage(RecordingLength.key) private var recordingSeconds = RecordingLength.defaultSeconds
+
     var body: some View {
         Form {
+            Section {
+                Stepper(value: $recordingSeconds, in: RecordingLength.range) {
+                    HStack {
+                        Text("Length")
+                        Spacer()
+                        Text("\(recordingSeconds) seconds")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Recording")
+            } footer: {
+                Text("Longer clips give recognition more to work with; shorter ones are quicker.")
+            }
+
             Section {
                 Group {
                     switch pushManager.permissionStatus {
@@ -136,6 +157,10 @@ struct SettingsScreen: View {
         if succeeded {
             await pushManager.deregister()
             auth.signOut()
+            // The account is gone, so the "last time you signed in with…"
+            // hint would point at nothing. Plain sign-out keeps it; deletion
+            // erases it.
+            auth.eraseLastSignInMethod()
         } else if deleteViewModel.errorMessage != nil {
             showDeleteErrorAlert = true
         }
