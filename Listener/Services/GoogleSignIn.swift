@@ -35,16 +35,18 @@ struct GoogleOAuthConfiguration: Sendable {
     /// the ID token's `aud` matches what `POST /auth/google` verifies.
     let serverClientID: String
 
-    /// The live configuration. `nil` until both client IDs exist, which
-    /// hides the Google button entirely — the branch is mergeable before
-    /// the console work happens.
+    /// The live configuration. Set to `nil` to hide the Google button
+    /// entirely (e.g. while rotating clients in the console).
     ///
-    /// To activate: in the Google Cloud console (MixMates project), publish
-    /// the OAuth consent screen to production, create an iOS-type OAuth
-    /// client for bundle `es.mixmat.listener` (no redirect-URI field — the
-    /// reversed-scheme redirect is implicit), then fill in that client ID
-    /// plus the existing web client ID here.
-    static let current: GoogleOAuthConfiguration? = nil
+    /// Both values are public identifiers by design — client IDs ship in
+    /// every binary and web page that uses them, and iOS-type clients have
+    /// no secret at all. `clientID` is the iOS-type client registered for
+    /// bundle `es.mixmat.listener`; `serverClientID` is the MixMates web
+    /// client whose ID the server expects as the ID token's audience.
+    static let current: GoogleOAuthConfiguration? = GoogleOAuthConfiguration(
+        clientID: "749341964038-gmgrdscp5ittso21vr2ror7o6hnfek7e.apps.googleusercontent.com",
+        serverClientID: "749341964038-biqtvpf8edumpf18qqn85pp2389223q3.apps.googleusercontent.com"
+    )
 
     /// Reverse-DNS redirect scheme derived from the iOS client ID:
     /// `NNN-xxx.apps.googleusercontent.com` → `com.googleusercontent.apps.NNN-xxx`.
