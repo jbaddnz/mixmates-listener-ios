@@ -35,6 +35,13 @@ struct LegalScreen: View {
             }
 
             Section("Trademarks") {
+                // Common-law (unregistered) marks — deliberately no
+                // "registered" and no ® symbol: falsely representing a
+                // mark as registered is an offence under the NZ Trade
+                // Marks Act. ™-style claims need no registration.
+                Text("MixMates, MixMates Listener, mixmat.es, and the mmL mark are trademarks of MixMat Ltd, a New Zealand company.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 Text("Apple and Apple Music are trademarks of Apple Inc., registered in the U.S. and other countries.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
