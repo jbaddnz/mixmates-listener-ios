@@ -13,6 +13,12 @@ struct ListenScreen: View {
 
     @EnvironmentObject private var auth: AuthState
     @StateObject private var viewModel = ListenScreenViewModel()
+
+    /// Kept alive across state changes and `prepare()`d when identifying
+    /// starts, so the Taptic Engine is warm when the result lands. An
+    /// unprepared, throwaway generator plays a weak single blip instead
+    /// of the crisp success double-tap.
+    @State private var successHaptics = UINotificationFeedbackGenerator()
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -73,10 +79,17 @@ struct ListenScreen: View {
             }
         }
         .onChange(of: viewModel.state) { newState in
-            // Success haptic on a caught song — free delight.
-            if case .result(let result) = newState,
-               result.status == .saved || result.status == .duplicate {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            // Success haptic on a caught song — free delight. The engine
+            // is warmed while AudD is identifying (the result arrives a
+            // beat later, well inside the prepare window) and fired only
+            // for an actual catch.
+            switch newState {
+            case .recognising:
+                successHaptics.prepare()
+            case .result(let result) where result.status == .saved || result.status == .duplicate:
+                successHaptics.notificationOccurred(.success)
+            default:
+                break
             }
         }
         .toolbar {
