@@ -40,6 +40,19 @@ struct ListenScreen: View {
             }
 
             Spacer()
+
+            if viewModel.state == .idle {
+                // Modest brand wordmark, deliberately non-tappable: a plain
+                // Image with no Link and no gesture. Rendered from the
+                // wordmark package (MuseoModerno 700, brand gradient) by
+                // the recipe in assets/mml-wordmark.
+                Image("MixmatEsWordmark")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 140)
+                    .accessibilityHidden(true)
+                    .padding(.bottom, 4)
+            }
         }
         .padding()
         .animation(.default, value: viewModel.state)
