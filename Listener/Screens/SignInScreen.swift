@@ -75,9 +75,11 @@ struct SignInScreen: View {
                     }
 
                     if let lastMethod = auth.lastSignInMethod {
-                        Text("Last time you signed in with \(lastMethod.displayName).")
+                        (Text("Last time you signed in with ")
+                            + Text(lastMethod.displayName).fontWeight(.bold)
+                            + Text("."))
                             .font(.caption)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.white.opacity(0.75))
                     }
 
                     Text("Free • No in-app purchases")

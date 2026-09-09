@@ -59,6 +59,13 @@ struct ListenScreen: View {
                 viewModel.checkPermission()
             }
         }
+        .onChange(of: viewModel.state) { newState in
+            // Success haptic on a caught song — free delight.
+            if case .result(let result) = newState,
+               result.status == .saved || result.status == .duplicate {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 NavigationLink {
@@ -151,8 +158,11 @@ struct ListenScreen: View {
 
     private var recognisingView: some View {
         VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(2.0)
+            // The shared brand working indicator — same spec as the web
+            // app's equalizer (and Android's), one heartbeat across all
+            // three surfaces. Stops when the result state replaces this
+            // view.
+            Equalizer(scale: 1.5)
             Text("Identifying…")
                 .font(.title3)
         }
@@ -164,6 +174,10 @@ struct ListenScreen: View {
             switch result.status {
             case .saved, .duplicate:
                 if let track = result.track {
+                    // The delight beat: the app just caught a song out of
+                    // the air. The brand soundwave pulses briefly and
+                    // settles (static under Reduce Motion).
+                    SuccessWave()
                     TrackCard(track: track, isDuplicate: result.status == .duplicate)
                         .padding(.horizontal)
                 }
@@ -204,10 +218,15 @@ struct ListenScreen: View {
                 }
             }
 
+            // Clear next action, one step below the Share hero: solid
+            // brand-cyan pill (the gradient's endpoint colour), set apart
+            // from the quiet "Wrong" above it.
             Button("Listen again") {
                 viewModel.reset()
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderedProminent)
+            .tint(Color(red: 44 / 255, green: 204 / 255, blue: 211 / 255))
+            .padding(.top, 8)
         }
     }
 

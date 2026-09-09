@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// Reusable card displaying a recognised or saved track.
 ///
@@ -90,10 +91,17 @@ struct TrackCard: View {
             platformButtons
 
             if let shareURL {
+                // Sharing is the product's thesis — a song is a message —
+                // so Share is the hero action and carries the brand
+                // gradient. Everything else on this card stays quieter.
                 ShareLink(item: shareURL) {
                     Label("Share link", systemImage: "square.and.arrow.up")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(LinearGradient.mixmatesBrand))
                 }
-                .font(.callout)
             }
         }
         .padding(16)
@@ -129,15 +137,24 @@ struct TrackCard: View {
         }
     }
 
+    /// Platform pills carry equal visual weight — identical shape, size,
+    /// and prominence, each in its own brand identity (Tidal's identity is
+    /// monochrome, rendered with label/background colours so it adapts to
+    /// light and dark). Never let one platform look preferred.
     @ViewBuilder
     private var platformButtons: some View {
         let items = platformButtonItems
         if !items.isEmpty {
             HStack(spacing: 8) {
                 ForEach(items, id: \.url) { item in
-                    Link(item.label, destination: item.url)
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                    Link(destination: item.url) {
+                        Text(item.label)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(item.foreground)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(item.background))
+                    }
                 }
             }
         }
@@ -146,18 +163,32 @@ struct TrackCard: View {
     private struct PlatformButtonItem {
         let label: String
         let url: URL
+        let background: Color
+        let foreground: Color
     }
+
+    private static let spotifyGreen = Color(red: 29 / 255, green: 185 / 255, blue: 84 / 255)
+    private static let appleMusicRed = Color(red: 250 / 255, green: 36 / 255, blue: 60 / 255)
 
     private var platformButtonItems: [PlatformButtonItem] {
         var items: [PlatformButtonItem] = []
         if let spotify = platforms.spotify {
-            items.append(PlatformButtonItem(label: "Spotify", url: spotify))
+            items.append(PlatformButtonItem(
+                label: "Spotify", url: spotify,
+                background: Self.spotifyGreen, foreground: .white
+            ))
         }
         if let appleMusic = platforms.appleMusic {
-            items.append(PlatformButtonItem(label: "Apple Music", url: appleMusic))
+            items.append(PlatformButtonItem(
+                label: "Apple Music", url: appleMusic,
+                background: Self.appleMusicRed, foreground: .white
+            ))
         }
         if let tidal = platforms.tidal {
-            items.append(PlatformButtonItem(label: "Tidal", url: tidal))
+            items.append(PlatformButtonItem(
+                label: "Tidal", url: tidal,
+                background: .primary, foreground: Color(uiColor: .systemBackground)
+            ))
         }
         return items
     }
