@@ -65,14 +65,21 @@ struct SettingsScreen: View {
                             Label("Group notifications enabled", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                             Spacer()
+                            // Deep-links to this app's Notifications page
+                            // rather than its top-level Settings entry, so
+                            // the control being talked about is the one on
+                            // screen when they arrive.
                             Button("Manage") {
-                                openURL(URL(string: UIApplication.openSettingsURLString)!)
+                                openURL(URL(string: UIApplication.openNotificationSettingsURLString)!)
                             }
                             .font(.callout)
                         }
                     case .denied:
+                        // A denied account can never be re-prompted in app,
+                        // so pointing at the only control that can change it
+                        // is the one honest affordance here.
                         Button("Enable in Settings") {
-                            openURL(URL(string: UIApplication.openSettingsURLString)!)
+                            openURL(URL(string: UIApplication.openNotificationSettingsURLString)!)
                         }
                     default:
                         EmptyView()

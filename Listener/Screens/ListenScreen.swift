@@ -12,6 +12,7 @@ import UIKit
 struct ListenScreen: View {
 
     @EnvironmentObject private var auth: AuthState
+    @EnvironmentObject private var pushManager: PushManager
     @StateObject private var viewModel = ListenScreenViewModel()
 
     /// Kept alive across state changes and `prepare()`d when identifying
@@ -20,6 +21,7 @@ struct ListenScreen: View {
     /// of the crisp success double-tap.
     @State private var successHaptics = UINotificationFeedbackGenerator()
     @State private var showShareSheet = false
+    @State private var showNotificationAsk = false
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -31,6 +33,19 @@ struct ListenScreen: View {
                 Text("Hi, \(profile.displayName)")
                     .font(.title3)
                     .foregroundStyle(.secondary)
+            }
+
+            // Only on the idle screen: a result has its own moment and
+            // should not be shouldered aside by a permission card.
+            if showNotificationAsk, viewModel.state == .idle {
+                NotificationAskCard(
+                    onTurnOn: {
+                        showNotificationAsk = false
+                        Task { await pushManager.requestPermission() }
+                    },
+                    onNotNow: { showNotificationAsk = false }
+                )
+                .padding(.horizontal)
             }
 
             switch viewModel.state {
@@ -65,11 +80,13 @@ struct ListenScreen: View {
         .animation(.default, value: viewModel.state)
         .animation(.default, value: viewModel.profile)
         .animation(.default, value: viewModel.permissionStatus)
+        .animation(.default, value: showNotificationAsk)
         .navigationTitle("Listen")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             viewModel.checkPermission()
             await loadProfile()
+            await offerNotificationsIfThisIsTheMoment()
         }
         .onChange(of: scenePhase) { newPhase in
             // Re-check permission when the user returns to the app — they
@@ -279,6 +296,7 @@ struct ListenScreen: View {
                 shareURL: result.track?.shareURL
             )
             .environmentObject(auth)
+            .environmentObject(pushManager)
         }
     }
 
@@ -307,6 +325,33 @@ struct ListenScreen: View {
             token: token,
             onUnauthorized: { @MainActor in auth.signOut() }
         )
+    }
+
+    /// Raise the pre-permission card if a returning account has just signed
+    /// in and nobody has been asked before.
+    ///
+    /// The returning-account signal is consumed either way, including when
+    /// the answer is no. It marks one event, and leaving it set would let a
+    /// later screen appearance treat the same sign-in as fresh.
+    private func offerNotificationsIfThisIsTheMoment() async {
+        guard auth.signedInToExistingAccount else { return }
+        defer { auth.clearExistingAccountSignIn() }
+
+        // The status was read at launch, which for a sign-in was some time
+        // ago and possibly before a trip to Settings.
+        await pushManager.refreshPermissionStatus()
+
+        guard NotificationAskPolicy.shouldAsk(
+            status: pushManager.permissionStatus,
+            alreadyAsked: NotificationAskPolicy.hasBeenAsked(),
+            trigger: .existingAccountSignedIn
+        ) else { return }
+
+        // Recorded on showing, not on answering. Putting the card in front
+        // of someone is what spends the one chance to ask; "Not now" has to
+        // mean not again.
+        NotificationAskPolicy.recordAsked()
+        showNotificationAsk = true
     }
 
     private func reportWrong(historyId: String) async {

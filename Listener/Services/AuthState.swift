@@ -45,6 +45,16 @@ final class AuthState: ObservableObject {
     @Published private(set) var token: String?
     @Published private(set) var lastSignInMethod: SignInMethod?
 
+    /// True when this session began by signing in to an account that
+    /// already existed, rather than one the server just created.
+    ///
+    /// Deliberately transient: never written to storage, cleared on sign-out,
+    /// and cleared by whoever acts on it. It describes an event, not a state,
+    /// and an event that survived a relaunch would fire at the wrong moment.
+    /// The notifications ask is the consumer today, because a returning
+    /// account is the one that already has groups worth being notified about.
+    @Published private(set) var signedInToExistingAccount = false
+
     private let storage: TokenStorage
     private let defaults: UserDefaults
 
@@ -59,8 +69,10 @@ final class AuthState: ObservableObject {
     }
 
     /// Persist a verified token and transition the app into the signed-in
-    /// state, recording which provider produced it.
-    func setToken(_ token: String, method: SignInMethod) {
+    /// state, recording which provider produced it and whether the account
+    /// already existed.
+    func setToken(_ token: String, method: SignInMethod, isNewAccount: Bool) {
+        signedInToExistingAccount = !isNewAccount
         // The keychain write is best-effort. If it fails (extremely rare on a
         // healthy device) the in-memory state still flips so the user can use
         // the app for this session; they will be prompted to sign in again on
@@ -78,6 +90,13 @@ final class AuthState: ObservableObject {
     func signOut() {
         try? storage.clear()
         self.token = nil
+        signedInToExistingAccount = false
+    }
+
+    /// Clear the returning-account flag once something has acted on it, so
+    /// it cannot fire twice within a session.
+    func clearExistingAccountSignIn() {
+        signedInToExistingAccount = false
     }
 
     /// Forget which provider was used last. Only account deletion calls this

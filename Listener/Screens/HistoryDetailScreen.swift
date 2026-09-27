@@ -24,6 +24,7 @@ struct HistoryDetailScreen: View {
     let id: String
 
     @EnvironmentObject private var auth: AuthState
+    @EnvironmentObject private var pushManager: PushManager
     @StateObject private var viewModel = HistoryDetailViewModel()
     @State private var showShareSheet = false
 
@@ -76,6 +77,7 @@ struct HistoryDetailScreen: View {
                 alreadySharedTo: detail.sharedTo.map(\.groupId)
             )
             .environmentObject(auth)
+            .environmentObject(pushManager)
         }
     }
 

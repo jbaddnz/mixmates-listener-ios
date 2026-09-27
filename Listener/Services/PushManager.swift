@@ -44,7 +44,20 @@ final class PushManager: NSObject, ObservableObject {
     // MARK: - Permission
 
     /// Request notification permission and register for APNs if granted.
-    /// Call after the user's first successful recognition, not on launch.
+    ///
+    /// Called from exactly two places, both moments where a notification has
+    /// just become relevant to this person: the pre-permission card (see
+    /// `NotificationAskPolicy` for when that appears) and the enable button
+    /// in Settings. Never on launch.
+    ///
+    /// Not after a recognition either, despite what this comment used to
+    /// claim for several releases while nothing called it at all. Catching a
+    /// track produces no notification for the person who caught it; being in
+    /// a group with someone else does.
+    ///
+    /// The option set is requested in full here on purpose. It is frozen at
+    /// the first grant, so an option added in a later build never reaches an
+    /// account that has already said yes.
     func requestPermission() async {
         let center = UNUserNotificationCenter.current()
         do {

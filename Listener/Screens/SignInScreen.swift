@@ -111,7 +111,9 @@ struct SignInScreen: View {
                 pendingNewAccount = nil
             }
             Button("Keep this account") {
-                auth.setToken(pending.token, method: pending.method)
+                // This branch only exists because the account was newly
+                // created, so nothing is waiting in a group yet.
+                auth.setToken(pending.token, method: pending.method, isNewAccount: true)
                 pendingNewAccount = nil
             }
         } message: { _ in
@@ -129,7 +131,7 @@ struct SignInScreen: View {
             pendingNewAccount = PendingSession(token: result.token, method: method)
             showNewAccountAlert = true
         } else {
-            auth.setToken(result.token, method: method)
+            auth.setToken(result.token, method: method, isNewAccount: false)
         }
     }
 

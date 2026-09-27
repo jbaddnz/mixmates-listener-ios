@@ -37,8 +37,10 @@ struct TrackShareSheet: View {
     var alreadySharedTo: [String] = []
 
     @EnvironmentObject private var auth: AuthState
+    @EnvironmentObject private var pushManager: PushManager
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = TrackShareViewModel()
+    @State private var showNotificationAsk = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -201,12 +203,26 @@ struct TrackShareSheet: View {
                 .foregroundStyle(.secondary)
             }
 
+            // The track is now somewhere other people will see it, which is
+            // the first moment a notification means anything to this person.
+            if showNotificationAsk {
+                NotificationAskCard(
+                    onTurnOn: {
+                        showNotificationAsk = false
+                        Task { await pushManager.requestPermission() }
+                    },
+                    onNotNow: { showNotificationAsk = false }
+                )
+                .padding(.top, 4)
+            }
+
             Button("Share somewhere else") {
                 viewModel.resetShareResults()
             }
             .font(.callout)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.default, value: showNotificationAsk)
     }
 
     // MARK: - System share
@@ -253,6 +269,29 @@ struct TrackShareSheet: View {
             token: token,
             onUnauthorized: { @MainActor in auth.signOut() }
         )
+        guard viewModel.shareResults != nil else { return }
+        await offerNotificationsIfThisIsTheMoment()
+    }
+
+    /// Raise the pre-permission card once a track has actually landed in a
+    /// group, which is the point at which somebody else can add to it and
+    /// there is finally something worth being told about.
+    ///
+    /// Unlike the sign-in trigger this has no event flag to consume. The
+    /// shown-once record in `NotificationAskPolicy` is what stops it
+    /// repeating, and it is shared with the sign-in trigger so between them
+    /// they ask a total of once.
+    private func offerNotificationsIfThisIsTheMoment() async {
+        await pushManager.refreshPermissionStatus()
+
+        guard NotificationAskPolicy.shouldAsk(
+            status: pushManager.permissionStatus,
+            alreadyAsked: NotificationAskPolicy.hasBeenAsked(),
+            trigger: .firstShareSucceeded
+        ) else { return }
+
+        NotificationAskPolicy.recordAsked()
+        showNotificationAsk = true
     }
 }
 
