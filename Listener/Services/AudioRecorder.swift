@@ -124,7 +124,11 @@ final class AVAudioRecorderImpl: NSObject, AudioRecording {
     }
 
     func currentPermissionStatus() -> AudioPermissionStatus {
-        if #available(iOS 17, *) {
+        // watchOS is named explicitly because the bare `*` means "every
+        // other platform at its own deployment minimum", which would take
+        // this branch on a watchOS 9 target where `AVAudioApplication`
+        // (watchOS 10+) does not exist. No effect on iOS.
+        if #available(iOS 17, watchOS 10, *) {
             switch AVAudioApplication.shared.recordPermission {
             case .granted: return .granted
             case .denied: return .denied
@@ -204,7 +208,7 @@ final class AVAudioRecorderImpl: NSObject, AudioRecording {
     /// `AVAudioApplication` async API, iOS 16 wraps the older
     /// `AVAudioSession` callback API in a continuation.
     private func ensureRecordPermission() async -> Bool {
-        if #available(iOS 17, *) {
+        if #available(iOS 17, watchOS 10, *) {
             switch AVAudioApplication.shared.recordPermission {
             case .granted:
                 return true
