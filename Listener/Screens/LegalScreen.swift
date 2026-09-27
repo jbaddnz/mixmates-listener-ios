@@ -59,6 +59,11 @@ struct LegalScreen: View {
             } header: {
                 Text("About MixMates Listener")
             }
+
+            Section {
+                MixmatEsWordmark()
+                    .wordmarkFooterRow()
+            }
         }
         .navigationTitle("Legal")
         .navigationBarTitleDisplayMode(.inline)

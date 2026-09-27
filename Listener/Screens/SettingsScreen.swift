@@ -126,6 +126,11 @@ struct SettingsScreen: View {
                 }
                 .disabled(deleteViewModel.isDeleting)
             }
+
+            Section {
+                MixmatEsWordmark()
+                    .wordmarkFooterRow()
+            }
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)

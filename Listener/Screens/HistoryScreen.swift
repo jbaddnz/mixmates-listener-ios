@@ -118,6 +118,9 @@ struct HistoryScreen: View {
                 }
                 .listRowSeparator(.hidden)
             }
+
+            MixmatEsWordmark()
+                .wordmarkFooterRow()
         }
         .listStyle(.plain)
     }
