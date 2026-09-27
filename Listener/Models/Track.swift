@@ -17,6 +17,12 @@ struct TrackDTO: Decodable {
     let shareUrl: String?
     let platforms: PlatformsDTO?
 
+    // Tempo and key are enriched asynchronously server-side, so all three
+    // are absent on a freshly recognised track and fill in later.
+    let bpm: Double?
+    let musicalKey: String?
+    let keyScale: String?
+
     enum CodingKeys: String, CodingKey {
         case title
         case artist
@@ -24,6 +30,9 @@ struct TrackDTO: Decodable {
         case shortcode
         case shareUrl = "share_url"
         case platforms
+        case bpm
+        case musicalKey = "musical_key"
+        case keyScale = "key_scale"
     }
 }
 
@@ -42,6 +51,7 @@ struct Track: Equatable {
     let shortcode: String?
     let shareURL: URL?
     let platforms: Platforms
+    let meta: TrackMeta
 
     init(dto: TrackDTO) {
         self.title = dto.title
@@ -50,6 +60,11 @@ struct Track: Equatable {
         self.shortcode = dto.shortcode
         self.shareURL = dto.shareUrl.flatMap(URL.init(string:))
         self.platforms = dto.platforms.map(Platforms.init(dto:)) ?? .empty
+        self.meta = TrackMeta(
+            bpm: dto.bpm,
+            musicalKey: dto.musicalKey,
+            keyScaleRaw: dto.keyScale
+        )
     }
 }
 

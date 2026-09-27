@@ -45,7 +45,10 @@ enum Fixtures {
             "spotify": "https://open.spotify.com/track/abc",
             "tidal": "https://tidal.com/browse/track/abc",
             "appleMusic": "https://music.apple.com/us/album/abc"
-          }
+          },
+          "bpm": 105,
+          "musical_key": "FSharp",
+          "key_scale": "MINOR"
         }
       }
     }
@@ -75,7 +78,10 @@ enum Fixtures {
             "platforms": {
               "spotify": "https://open.spotify.com/track/abc"
             },
-            "created_at": "2026-04-10T10:00:00Z"
+            "created_at": "2026-04-10T10:00:00Z",
+            "bpm": 105,
+            "musical_key": "FSharp",
+            "key_scale": "MINOR"
           },
           {
             "id": "h_2",
@@ -150,7 +156,10 @@ enum Fixtures {
         "created_at": "2026-04-10T10:00:00Z",
         "shared_to": [
           { "group_id": "g1", "group_name": "Wellington Batucada" }
-        ]
+        ],
+        "bpm": 105,
+        "musical_key": "FSharp",
+        "key_scale": "MINOR"
       }
     }
     """#

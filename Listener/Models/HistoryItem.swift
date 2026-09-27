@@ -30,11 +30,16 @@ struct HistoryItemDTO: Decodable {
     let shareUrl: String?
     let platforms: PlatformsDTO?
     let createdAt: String
+    let bpm: Double?
+    let musicalKey: String?
+    let keyScale: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, artist, thumbnail, shortcode, platforms
+        case id, title, artist, thumbnail, shortcode, platforms, bpm
         case shareUrl = "share_url"
         case createdAt = "created_at"
+        case musicalKey = "musical_key"
+        case keyScale = "key_scale"
     }
 }
 
@@ -48,12 +53,17 @@ struct HistoryDetailDTO: Decodable {
     let platforms: PlatformsDTO?
     let createdAt: String
     let sharedTo: [SharedGroupDTO]
+    let bpm: Double?
+    let musicalKey: String?
+    let keyScale: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, artist, thumbnail, shortcode, platforms
+        case id, title, artist, thumbnail, shortcode, platforms, bpm
         case shareUrl = "share_url"
         case createdAt = "created_at"
         case sharedTo = "shared_to"
+        case musicalKey = "musical_key"
+        case keyScale = "key_scale"
     }
 }
 
@@ -98,6 +108,7 @@ struct HistoryItem: Identifiable, Equatable {
     let shareURL: URL?
     let platforms: Platforms
     let createdAt: Date
+    let meta: TrackMeta
 
     init(dto: HistoryItemDTO) {
         self.id = dto.id
@@ -108,6 +119,11 @@ struct HistoryItem: Identifiable, Equatable {
         self.shareURL = dto.shareUrl.flatMap(URL.init(string:))
         self.platforms = dto.platforms.map(Platforms.init(dto:)) ?? .empty
         self.createdAt = parseHistoryDate(dto.createdAt)
+        self.meta = TrackMeta(
+            bpm: dto.bpm,
+            musicalKey: dto.musicalKey,
+            keyScaleRaw: dto.keyScale
+        )
     }
 }
 
@@ -121,6 +137,7 @@ struct HistoryDetail: Identifiable, Equatable {
     let platforms: Platforms
     let createdAt: Date
     let sharedTo: [SharedGroup]
+    let meta: TrackMeta
 
     init(dto: HistoryDetailDTO) {
         self.id = dto.id
@@ -132,6 +149,11 @@ struct HistoryDetail: Identifiable, Equatable {
         self.platforms = dto.platforms.map(Platforms.init(dto:)) ?? .empty
         self.createdAt = parseHistoryDate(dto.createdAt)
         self.sharedTo = dto.sharedTo.map(SharedGroup.init(dto:))
+        self.meta = TrackMeta(
+            bpm: dto.bpm,
+            musicalKey: dto.musicalKey,
+            keyScaleRaw: dto.keyScale
+        )
     }
 }
 

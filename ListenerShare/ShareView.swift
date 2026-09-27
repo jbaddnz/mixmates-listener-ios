@@ -227,6 +227,12 @@ struct ShareView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            if let metaLabel = track.meta.label {
+                Text(metaLabel)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

@@ -25,6 +25,7 @@ struct TrackCard: View {
     let artist: String
     let thumbnail: URL?
     let platforms: Platforms
+    let meta: TrackMeta
     let isDuplicate: Bool
 
     /// Opens the caller's share sheet. The card deliberately knows nothing
@@ -38,6 +39,7 @@ struct TrackCard: View {
         artist: String,
         thumbnail: URL?,
         platforms: Platforms,
+        meta: TrackMeta = .empty,
         isDuplicate: Bool = false,
         onShare: @escaping () -> Void
     ) {
@@ -45,6 +47,7 @@ struct TrackCard: View {
         self.artist = artist
         self.thumbnail = thumbnail
         self.platforms = platforms
+        self.meta = meta
         self.isDuplicate = isDuplicate
         self.onShare = onShare
     }
@@ -55,6 +58,7 @@ struct TrackCard: View {
             artist: track.artist,
             thumbnail: track.thumbnail,
             platforms: track.platforms,
+            meta: track.meta,
             isDuplicate: isDuplicate,
             onShare: onShare
         )
@@ -66,6 +70,7 @@ struct TrackCard: View {
             artist: detail.artist,
             thumbnail: detail.thumbnail,
             platforms: detail.platforms,
+            meta: detail.meta,
             isDuplicate: false,
             onShare: onShare
         )
@@ -83,6 +88,16 @@ struct TrackCard: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    // Tempo and key, for the DJ reading this at a gig.
+                    // Absent on a track caught seconds ago and filled in by
+                    // the time it is seen again, so the row simply has no
+                    // tag rather than an empty or zeroed one.
+                    if let metaLabel = meta.label {
+                        Text(metaLabel)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 0)
             }

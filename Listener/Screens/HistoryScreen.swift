@@ -178,6 +178,12 @@ private struct HistoryRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let metaLabel = item.meta.label {
+                    Text(metaLabel)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer()
             Text(item.createdAt, format: .relative(presentation: .named))

@@ -158,6 +158,51 @@ struct DecodingTests {
 
     // MARK: - Forward-compatibility for unknown enum values
 
+    // MARK: - Tempo and key
+
+    @Test func decodesTempoAndKeyOnARecognisedTrack() throws {
+        let envelope = try decoder.decode(APIResponse<RecognizeDTO>.self, from: Data(Fixtures.recognizeSaved.utf8))
+        let track = try #require(envelope.data.track.map(Track.init(dto:)))
+
+        #expect(track.meta.bpm == 105)
+        #expect(track.meta.musicalKey == "FSharp")
+        #expect(track.meta.keyScale == .minor)
+        #expect(track.meta.label == "105 BPM · F♯m")
+    }
+
+    @Test func decodesTempoAndKeyOnHistoryRows() throws {
+        let envelope = try decoder.decode(APIResponse<HistoryListDTO>.self, from: Data(Fixtures.history.utf8))
+        let items = HistoryList(dto: envelope.data).items
+
+        #expect(items[0].meta.label == "105 BPM · F♯m")
+
+        // The second row is deliberately unenriched. That is the normal
+        // state for a track caught moments ago, since the server fills
+        // tempo and key in asynchronously.
+        #expect(items[1].meta == .empty)
+        #expect(items[1].meta.label == nil)
+    }
+
+    /// The detail endpoint originally dropped these fields while the list
+    /// carried them, so this one is worth asserting separately rather than
+    /// assuming it follows from the list.
+    @Test func decodesTempoAndKeyOnTheDetail() throws {
+        let envelope = try decoder.decode(APIResponse<HistoryDetailDTO>.self, from: Data(Fixtures.historyDetail.utf8))
+        let detail = HistoryDetail(dto: envelope.data)
+
+        #expect(detail.meta.label == "105 BPM · F♯m")
+    }
+
+    /// The fields arrived after the app had already shipped without them,
+    /// so every payload that predates them must still decode cleanly.
+    @Test func payloadsWithoutTempoOrKeyStillDecode() throws {
+        let envelope = try decoder.decode(APIResponse<HistoryDetailDTO>.self, from: Data(Fixtures.historyDetailNoShares.utf8))
+        let detail = HistoryDetail(dto: envelope.data)
+
+        #expect(detail.meta == .empty)
+        #expect(detail.meta.label == nil)
+    }
+
     @Test func unknownRecognitionStatusBecomesOther() {
         #expect(RecognitionStatus(rawValue: "totally_new") == .other("totally_new"))
     }
