@@ -97,10 +97,22 @@ struct ListenScreen: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 NavigationLink {
                     HistoryScreen()
+                        .onAppear { viewModel.markHistoryViewed() }
                 } label: {
                     Image(systemName: "clock.arrow.circlepath")
+                        .overlay(alignment: .topTrailing) {
+                            // Answers "where did my track go?" at the moment
+                            // the question forms. Brand cyan rather than red,
+                            // which would read as an error rather than news.
+                            if viewModel.hasUnseenTracks {
+                                Circle()
+                                    .fill(Color.mixmatesCyan)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 3, y: -2)
+                            }
+                        }
                 }
-                .accessibilityLabel("History")
+                .accessibilityLabel(viewModel.hasUnseenTracks ? "History, new tracks" : "History")
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 NavigationLink {
@@ -256,7 +268,7 @@ struct ListenScreen: View {
                 viewModel.reset()
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(red: 44 / 255, green: 204 / 255, blue: 211 / 255))
+            .tint(Color.mixmatesCyan)
             .padding(.top, 8)
         }
         // `auth` is re-injected explicitly rather than relied on to flow
@@ -359,6 +371,17 @@ final class ListenScreenViewModel: ObservableObject {
 
     /// Whether the current recognition result has been reported as wrong.
     @Published private(set) var reported = false
+
+    /// Whether a track has been saved to History since History was last
+    /// opened, which drives the dot on the toolbar icon.
+    ///
+    /// Session-local by design. A badge that survived relaunch would need
+    /// somewhere to persist and a rule for when it expires, and the question
+    /// it answers is "where did the track I just caught go?", which only
+    /// arises in the session that caught it. A Share Extension resolve also
+    /// lands in History and is not counted here; App Groups would make that
+    /// possible later.
+    @Published private(set) var hasUnseenTracks = false
 
     private let audioRecorder: AudioRecording
     private let client: HTTPClient
@@ -552,6 +575,12 @@ final class ListenScreenViewModel: ObservableObject {
         do {
             let result = try await api.recognize(audio: audio, mimeType: "audio/mp4")
             state = .result(result)
+            // A history id means there is now a row worth looking at, which
+            // covers a duplicate as well as a fresh save. A no-match leaves
+            // nothing behind and must not raise the dot.
+            if result.historyId != nil {
+                hasUnseenTracks = true
+            }
         } catch APIError.unauthorized {
             // The api has already invoked onUnauthorized, which signs the
             // user out. The view will re-render to TokenEntry. Reset our
@@ -568,9 +597,18 @@ final class ListenScreenViewModel: ObservableObject {
     /// Reset the recording state machine to `.idle` while preserving the
     /// loaded `profile` and `permissionStatus`. Tapping "Listen again"
     /// should not re-fetch profile or re-check permission.
+    ///
+    /// `hasUnseenTracks` deliberately survives too: the track is still
+    /// sitting in History unseen, and listening again does not change that.
+    /// Only opening History does.
     func reset() {
         state = .idle
         reported = false
+    }
+
+    /// Clear the toolbar dot. Called when `HistoryScreen` appears.
+    func markHistoryViewed() {
+        hasUnseenTracks = false
     }
 
     func reportWrong(

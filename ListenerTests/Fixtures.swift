@@ -34,6 +34,7 @@ enum Fixtures {
     {
       "data": {
         "status": "saved",
+        "history_id": "h_77",
         "source": "recognition",
         "track": {
           "title": "Midnight City",
@@ -45,6 +46,31 @@ enum Fixtures {
             "spotify": "https://open.spotify.com/track/abc",
             "tidal": "https://tidal.com/browse/track/abc",
             "appleMusic": "https://music.apple.com/us/album/abc"
+          },
+          "bpm": 105,
+          "musical_key": "FSharp",
+          "key_scale": "MINOR"
+        }
+      }
+    }
+    """#
+
+    /// Already in the user's history. Still carries a `history_id`, because
+    /// the row exists and is worth opening.
+    static let recognizeDuplicate = #"""
+    {
+      "data": {
+        "status": "duplicate",
+        "history_id": "h_77",
+        "source": "recognition",
+        "track": {
+          "title": "Midnight City",
+          "artist": "M83",
+          "thumbnail": "https://img.example.com/m83.jpg",
+          "shortcode": "aBcDeF12",
+          "share_url": "https://mixmat.es/aBcDeF12",
+          "platforms": {
+            "spotify": "https://open.spotify.com/track/abc"
           },
           "bpm": 105,
           "musical_key": "FSharp",

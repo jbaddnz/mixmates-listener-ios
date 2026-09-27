@@ -369,6 +369,63 @@ struct ListenScreenViewModelTests {
         // Resetting recording state doesn't undo the user's grant or deny.
         #expect(viewModel.permissionStatus == .denied)
     }
+
+    // MARK: - Unseen-tracks dot
+
+    @Test func noUnseenTracksBeforeAnythingIsCaught() {
+        #expect(makeViewModel().hasUnseenTracks == false)
+    }
+
+    @Test func aSavedTrackRaisesTheDot() async {
+        let viewModel = makeViewModel()
+
+        await viewModel.record(token: "test-token", onUnauthorized: {})
+
+        #expect(viewModel.hasUnseenTracks)
+    }
+
+    /// A duplicate still puts a row in front of the user, so it counts.
+    @Test func aDuplicateRaisesTheDot() async {
+        let viewModel = makeViewModel(handler: { _ in
+            StubResponses.ok(Fixtures.recognizeDuplicate)
+        })
+
+        await viewModel.record(token: "test-token", onUnauthorized: {})
+
+        #expect(viewModel.hasUnseenTracks)
+    }
+
+    /// Nothing was saved, so there is nothing in History to point at.
+    @Test func aNoMatchDoesNotRaiseTheDot() async {
+        let viewModel = makeViewModel(handler: { _ in
+            StubResponses.ok(Fixtures.recognizeNoMatch)
+        })
+
+        await viewModel.record(token: "test-token", onUnauthorized: {})
+
+        #expect(viewModel.hasUnseenTracks == false)
+    }
+
+    /// Listening again does not make the earlier track any more seen.
+    @Test func theDotSurvivesReset() async {
+        let viewModel = makeViewModel()
+        await viewModel.record(token: "test-token", onUnauthorized: {})
+        #expect(viewModel.hasUnseenTracks)
+
+        viewModel.reset()
+
+        #expect(viewModel.hasUnseenTracks)
+    }
+
+    @Test func openingHistoryClearsTheDot() async {
+        let viewModel = makeViewModel()
+        await viewModel.record(token: "test-token", onUnauthorized: {})
+        #expect(viewModel.hasUnseenTracks)
+
+        viewModel.markHistoryViewed()
+
+        #expect(viewModel.hasUnseenTracks == false)
+    }
 }
 
 // MARK: - Test helpers
