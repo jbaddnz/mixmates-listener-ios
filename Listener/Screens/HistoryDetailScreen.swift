@@ -8,22 +8,24 @@
 import Combine
 import SwiftUI
 
-/// Detail view for a single saved history item. Loads the detail and the
-/// list of groups in parallel on appear, preselects groups the track is
-/// already shared to, and lets the user toggle the selection and post the
-/// share request.
+/// Detail view for a single saved history item.
 ///
-/// Layout follows the Android sibling's `HistoryDetailScreen.kt`:
-/// - `TrackCard` at the top (the same component used by `ListenScreen`)
+/// - `TrackCard` at the top (the same component used by `ListenScreen`),
+///   whose Share hero opens `TrackShareSheet`
 /// - Read-only "Shared to" section listing existing shares
-/// - "Share to groups" multi-select with per-group result strings after a
-///   successful share
+///
+/// Sharing itself moved out to `TrackShareSheet`, so this screen and the
+/// recognition result now offer one identical surface rather than two
+/// implementations of the same picker. This is a deliberate divergence from
+/// the Android sibling's `HistoryDetailScreen.kt`, which still carries its
+/// picker inline.
 struct HistoryDetailScreen: View {
 
     let id: String
 
     @EnvironmentObject private var auth: AuthState
     @StateObject private var viewModel = HistoryDetailViewModel()
+    @State private var showShareSheet = false
 
     var body: some View {
         Group {
@@ -55,19 +57,25 @@ struct HistoryDetailScreen: View {
     private func content(for detail: HistoryDetail) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                TrackCard(detail: detail)
+                TrackCard(detail: detail, onShare: { showShareSheet = true })
 
                 if !detail.sharedTo.isEmpty {
                     Divider()
                     sharedToSection(groups: detail.sharedTo)
                 }
-
-                if !viewModel.groups.isEmpty {
-                    Divider()
-                    shareToGroupsSection
-                }
             }
             .padding()
+        }
+        .sheet(
+            isPresented: $showShareSheet,
+            onDismiss: { Task { await refreshAfterShare() } }
+        ) {
+            TrackShareSheet(
+                historyId: detail.id,
+                shareURL: detail.shareURL,
+                alreadySharedTo: detail.sharedTo.map(\.groupId)
+            )
+            .environmentObject(auth)
         }
     }
 
@@ -78,58 +86,6 @@ struct HistoryDetailScreen: View {
             ForEach(groups, id: \.groupId) { group in
                 Text(group.groupName)
                     .font(.body)
-            }
-        }
-    }
-
-    private var shareToGroupsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Share to groups")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(viewModel.groups) { group in
-                    Button {
-                        viewModel.toggleGroup(group.id)
-                    } label: {
-                        let isSelected = viewModel.selectedGroupIds.contains(group.id)
-                        HStack(spacing: 12) {
-                            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                // The ternary can't directly unify `.tint` (`TintShapeStyle`)
-                                // with `.secondary` (`HierarchicalShapeStyle`), so coerce
-                                // both branches to `Color` which is uniformly typed.
-                                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                            Text(group.name)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            Button {
-                Task { await share() }
-            } label: {
-                if viewModel.isSharing {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text("Share")
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(viewModel.selectedGroupIds.isEmpty || viewModel.isSharing)
-
-            if let results = viewModel.shareResults {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(results, id: \.groupId) { result in
-                        Text(displayStatus(for: result))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
         }
     }
@@ -154,30 +110,21 @@ struct HistoryDetailScreen: View {
 
     // MARK: - Helpers
 
-    private func displayStatus(for result: ShareResult) -> String {
-        let groupName = viewModel.groups.first(where: { $0.id == result.groupId })?.name ?? result.groupId
-        switch result.status {
-        case .shared:
-            return "Shared to \(groupName)"
-        case .duplicate:
-            return "Already in \(groupName)!"
-        case .other(let status):
-            return "\(groupName): \(status)"
-        }
-    }
-
-    private func load() async {
+    /// Pick up any shares made in the sheet, so the read-only "Shared to"
+    /// list is not left describing the state of things before it opened.
+    private func refreshAfterShare() async {
         guard let token = auth.token else { return }
-        await viewModel.load(
+        await viewModel.refreshQuietly(
             id: id,
             token: token,
             onUnauthorized: { @MainActor in auth.signOut() }
         )
     }
 
-    private func share() async {
+    private func load() async {
         guard let token = auth.token else { return }
-        await viewModel.share(
+        await viewModel.load(
+            id: id,
             token: token,
             onUnauthorized: { @MainActor in auth.signOut() }
         )
@@ -199,9 +146,13 @@ struct HistoryDetailScreen: View {
 
 // MARK: - View model
 
-/// View model for `HistoryDetailScreen`. Loads the history detail and the
-/// available groups in parallel, manages the share-to-groups selection, and
-/// posts the share request.
+/// View model for `HistoryDetailScreen`. Fetches one saved history item.
+///
+/// Group loading, selection and the share call used to live here as well.
+/// They moved to `TrackShareSheet` when the app consolidated on a single
+/// sharing surface, which is why this type is now only a detail fetch and
+/// why the screen no longer has all-or-nothing load semantics across two
+/// endpoints.
 ///
 /// `import Combine` is required because Xcode 26's `MemberImportVisibility`
 /// upcoming feature no longer implicitly re-exports Combine through SwiftUI.
@@ -209,11 +160,7 @@ struct HistoryDetailScreen: View {
 final class HistoryDetailViewModel: ObservableObject {
 
     @Published private(set) var detail: HistoryDetail?
-    @Published private(set) var groups: [HumanGroup] = []
-    @Published private(set) var selectedGroupIds: Set<String> = []
     @Published private(set) var isLoading: Bool = true
-    @Published private(set) var isSharing: Bool = false
-    @Published private(set) var shareResults: [ShareResult]?
     @Published private(set) var errorMessage: String?
 
     private let client: HTTPClient
@@ -222,10 +169,8 @@ final class HistoryDetailViewModel: ObservableObject {
         self.client = client
     }
 
-    /// Fetch the detail and the user's groups in parallel. Both must succeed
-    /// for the screen to enter its loaded state — if either fails the user
-    /// sees a full-screen error with retry, matching the Android sibling's
-    /// all-or-nothing semantics.
+    /// Fetch the detail, showing the full-screen loading state while it runs
+    /// and the full-screen error state if it fails.
     func load(
         id: String,
         token: String,
@@ -234,58 +179,31 @@ final class HistoryDetailViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-
-        let api = ListenerAPI(
-            client: client,
-            tokenProvider: { token },
-            onUnauthorized: onUnauthorized
-        )
-
-        do {
-            async let detailFetch = api.historyDetail(id: id)
-            async let groupsFetch = api.groups()
-
-            let (loadedDetail, loadedGroups) = try await (detailFetch, groupsFetch)
-
-            self.detail = loadedDetail
-            self.groups = loadedGroups
-            self.selectedGroupIds = Set(loadedDetail.sharedTo.map { $0.groupId })
-        } catch APIError.unauthorized {
-            // Sign-out fired by API actor; clear local state.
-            self.detail = nil
-            self.groups = []
-            self.selectedGroupIds = []
-        } catch {
-            self.errorMessage = mapErrorMessage(for: error)
-        }
+        await fetch(id: id, token: token, onUnauthorized: onUnauthorized, quiet: false)
     }
 
-    /// Toggle a group's selection. Also clears any stale `shareResults` so
-    /// the user doesn't see "Shared to X" copy next to a checkbox they just
-    /// changed.
-    func toggleGroup(_ id: String) {
-        if selectedGroupIds.contains(id) {
-            selectedGroupIds.remove(id)
-        } else {
-            selectedGroupIds.insert(id)
-        }
-        if shareResults != nil {
-            shareResults = nil
-        }
-    }
-
-    /// Post the share. No-ops if there's nothing to share or no detail
-    /// loaded. On success stores the per-group results so the screen can
-    /// render the "Already in X!" / "Shared to X" status strings.
-    func share(
+    /// Refetch without touching `isLoading`, so the screen does not throw a
+    /// full-screen spinner over content the reader is already looking at.
+    ///
+    /// Called when the share sheet closes, where the only thing that can have
+    /// changed is which groups the track is in. A failure is swallowed on
+    /// purpose: what is on screen is still valid, merely possibly missing a
+    /// share from a moment ago, and an error alert thrown over a working
+    /// screen would be the worse outcome.
+    func refreshQuietly(
+        id: String,
         token: String,
         onUnauthorized: @Sendable @escaping () async -> Void
     ) async {
-        guard let detail, !selectedGroupIds.isEmpty else { return }
-        isSharing = true
-        errorMessage = nil
-        defer { isSharing = false }
+        await fetch(id: id, token: token, onUnauthorized: onUnauthorized, quiet: true)
+    }
 
+    private func fetch(
+        id: String,
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void,
+        quiet: Bool
+    ) async {
         let api = ListenerAPI(
             client: client,
             tokenProvider: { token },
@@ -293,17 +211,12 @@ final class HistoryDetailViewModel: ObservableObject {
         )
 
         do {
-            let outcome = try await api.shareHistory(
-                id: detail.id,
-                groupIds: Array(selectedGroupIds)
-            )
-            self.shareResults = outcome.results
+            detail = try await api.historyDetail(id: id)
         } catch APIError.unauthorized {
-            // Already handled by callback.
-        } catch APIError.groupLocked {
-            self.errorMessage = "This group is no longer accepting new tracks"
+            // Sign-out fired by the API actor; clear local state.
+            if !quiet { detail = nil }
         } catch {
-            self.errorMessage = "Couldn't share — try again"
+            if !quiet { errorMessage = mapErrorMessage(for: error) }
         }
     }
 

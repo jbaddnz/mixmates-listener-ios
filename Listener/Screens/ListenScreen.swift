@@ -19,6 +19,7 @@ struct ListenScreen: View {
     /// unprepared, throwaway generator plays a weak single blip instead
     /// of the crisp success double-tap.
     @State private var successHaptics = UINotificationFeedbackGenerator()
+    @State private var showShareSheet = false
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -204,8 +205,12 @@ struct ListenScreen: View {
                     // the air. The brand soundwave pulses briefly and
                     // settles (static under Reduce Motion).
                     SuccessWave()
-                    TrackCard(track: track, isDuplicate: result.status == .duplicate)
-                        .padding(.horizontal)
+                    TrackCard(
+                        track: track,
+                        isDuplicate: result.status == .duplicate,
+                        onShare: { showShareSheet = true }
+                    )
+                    .padding(.horizontal)
                 }
             case .noMatch:
                 VStack(spacing: 8) {
@@ -253,6 +258,15 @@ struct ListenScreen: View {
             .buttonStyle(.borderedProminent)
             .tint(Color(red: 44 / 255, green: 204 / 255, blue: 211 / 255))
             .padding(.top, 8)
+        }
+        // `auth` is re-injected explicitly rather than relied on to flow
+        // into the sheet's own presentation context.
+        .sheet(isPresented: $showShareSheet) {
+            TrackShareSheet(
+                historyId: result.historyId,
+                shareURL: result.track?.shareURL
+            )
+            .environmentObject(auth)
         }
     }
 

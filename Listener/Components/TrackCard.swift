@@ -25,44 +25,49 @@ struct TrackCard: View {
     let artist: String
     let thumbnail: URL?
     let platforms: Platforms
-    let shareURL: URL?
     let isDuplicate: Bool
+
+    /// Opens the caller's share sheet. The card deliberately knows nothing
+    /// about *what* gets shared: it holds no share URL and no history id, so
+    /// there is one sharing surface in the app and the card cannot grow a
+    /// second one beside it.
+    let onShare: () -> Void
 
     init(
         title: String,
         artist: String,
         thumbnail: URL?,
         platforms: Platforms,
-        shareURL: URL?,
-        isDuplicate: Bool = false
+        isDuplicate: Bool = false,
+        onShare: @escaping () -> Void
     ) {
         self.title = title
         self.artist = artist
         self.thumbnail = thumbnail
         self.platforms = platforms
-        self.shareURL = shareURL
         self.isDuplicate = isDuplicate
+        self.onShare = onShare
     }
 
-    init(track: Track, isDuplicate: Bool = false) {
+    init(track: Track, isDuplicate: Bool = false, onShare: @escaping () -> Void) {
         self.init(
             title: track.title,
             artist: track.artist,
             thumbnail: track.thumbnail,
             platforms: track.platforms,
-            shareURL: track.shareURL,
-            isDuplicate: isDuplicate
+            isDuplicate: isDuplicate,
+            onShare: onShare
         )
     }
 
-    init(detail: HistoryDetail) {
+    init(detail: HistoryDetail, onShare: @escaping () -> Void) {
         self.init(
             title: detail.title,
             artist: detail.artist,
             thumbnail: detail.thumbnail,
             platforms: detail.platforms,
-            shareURL: detail.shareURL,
-            isDuplicate: false
+            isDuplicate: false,
+            onShare: onShare
         )
     }
 
@@ -90,18 +95,16 @@ struct TrackCard: View {
 
             platformButtons
 
-            if let shareURL {
-                // Sharing is the product's thesis — a song is a message —
-                // so Share is the hero action and carries the brand
-                // gradient. Everything else on this card stays quieter.
-                ShareLink(item: shareURL) {
-                    Label("Share link", systemImage: "square.and.arrow.up")
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Capsule().fill(LinearGradient.mixmatesBrand))
-                }
+            // Sharing is the product's thesis — a song is a message — so
+            // Share is the hero action and carries the brand gradient.
+            // Everything else on this card stays quieter.
+            //
+            // The hero opens the app's own sheet, which puts groups above
+            // the system share: sharing into a group is the point of the
+            // product, and the public link is the fallback rather than the
+            // headline.
+            Button(action: onShare) {
+                shareHero
             }
         }
         .padding(16)
@@ -110,6 +113,15 @@ struct TrackCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.1))
         }
+    }
+
+    private var shareHero: some View {
+        Label("Share", systemImage: "square.and.arrow.up")
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Capsule().fill(LinearGradient.mixmatesBrand))
     }
 
     @ViewBuilder
