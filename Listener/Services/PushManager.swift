@@ -48,7 +48,7 @@ final class PushManager: NSObject, ObservableObject {
     func requestPermission() async {
         let center = UNUserNotificationCenter.current()
         do {
-            let granted = try await center.requestAuthorization(options: [.alert, .sound])
+            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
             permissionStatus = granted ? .authorized : .denied
             if granted {
                 UIApplication.shared.registerForRemoteNotifications()
@@ -103,6 +103,33 @@ final class PushManager: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Badge
+
+    /// Clear the home-screen icon badge.
+    ///
+    /// The server sends `aps.badge: 1` as a plain "something arrived since you
+    /// last opened the app" indicator rather than an unread count. A real count
+    /// can't work against this clearing model: the badge is cleared locally and
+    /// the server is never told, so a server-held count would keep counting and
+    /// re-badge with a stale number. If the number ever needs to be accurate,
+    /// that's a read-state feature (a mark-read call), not a bigger payload.
+    ///
+    /// No availability branch needed: `setBadgeCount(_:)` is iOS 16.0+ (checked
+    /// against the SDK header, `API_AVAILABLE(ios(16.0))`), which is exactly
+    /// this app's deployment target. It's easy to assume it's 17+ because that
+    /// is when the older `UIApplication.applicationIconBadgeNumber` was
+    /// deprecated — but the replacement shipped a year earlier, so the
+    /// deprecated API is never needed here.
+    ///
+    /// Best-effort — a failure here leaves a stale badge, which is cosmetic.
+    func clearBadge() async {
+        do {
+            try await UNUserNotificationCenter.current().setBadgeCount(0)
+        } catch {
+            // Best-effort. Next foreground will try again.
+        }
+    }
+
     // MARK: - Private
 
     private func makeAPI() -> ListenerAPI {
@@ -136,6 +163,11 @@ extension PushManager: UNUserNotificationCenterDelegate {
     }
 
     /// Show notifications even when the app is in the foreground.
+    ///
+    /// `.badge` is deliberately omitted: the user is already looking at the
+    /// app, so badging the icon for a notification that arrived on-screen
+    /// would leave an indicator pointing at something already seen. Leaving it
+    /// out means an in-app arrival never badges. Don't "fix" this.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
