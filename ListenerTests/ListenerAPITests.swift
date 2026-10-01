@@ -415,9 +415,34 @@ struct ListenerAPITests {
         }
     }
 
-    @Test func http403WithOtherCodeFallsBackToGenericHTTPError() async throws {
+    /// A share refusal carries one of several 403 codes, and each needs its
+    /// own words and its own recovery. Keyed on the code, never the status.
+    @Test(arguments: [
+        APIError.nameRequired(payload: APIErrorPayload(code: "name_required", message: "m")),
+        APIError.notGroupMember(payload: APIErrorPayload(code: "not_found", message: "m")),
+        APIError.listenDisabled(payload: APIErrorPayload(code: "auth_listen_disabled", message: "m")),
+    ])
+    func http403CodesBecomeTheirOwnErrors(expected: APIError) async throws {
+        let code: String
+        switch expected {
+        case .nameRequired(let payload), .notGroupMember(let payload), .listenDisabled(let payload):
+            code = try #require(payload?.code)
+        default:
+            Issue.record("Not a 403 case: \(expected)")
+            return
+        }
         let api = makeAPI(handler: { _ in
-            StubResponses.http(403, body: #"{"error":{"code":"not_found","message":"Not a member of target group"}}"#)
+            StubResponses.http(403, body: #"{"error":{"code":"\#(code)","message":"m"}}"#)
+        })
+
+        await #expect(throws: expected) {
+            _ = try await api.shareHistory(id: "h_1", groupIds: ["g1"])
+        }
+    }
+
+    @Test func http403WithUnknownCodeFallsBackToGenericHTTPError() async throws {
+        let api = makeAPI(handler: { _ in
+            StubResponses.http(403, body: #"{"error":{"code":"something_new","message":"m"}}"#)
         })
 
         do {
@@ -425,9 +450,49 @@ struct ListenerAPITests {
             Issue.record("Expected http error")
         } catch let APIError.http(status, payload) {
             #expect(status == 403)
-            #expect(payload?.code == "not_found")
+            #expect(payload?.code == "something_new")
         } catch {
             Issue.record("Got wrong error: \(error)")
+        }
+    }
+
+    @Test func updateDisplayNamePatchesAuthMeAndReturnsProfile() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.ok(Fixtures.authMe)
+        })
+
+        let profile = try await api.updateDisplayName("Jamie")
+
+        #expect(captured.value?.httpMethod == "PATCH")
+        #expect(captured.value?.url?.path.hasSuffix("/auth/me") == true)
+        #expect(captured.value?.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["display_name"] as? String == "Jamie")
+        #expect(profile.displayName == "Jamie")
+    }
+
+    /// A relay address and a plain bad value are both 400s, but only the
+    /// relay one gets the specific copy, so they must arrive as different
+    /// errors.
+    @Test func http400PrivateRelayNameBecomesItsOwnError() async throws {
+        let api = makeAPI(handler: { _ in
+            StubResponses.http(400, body: #"{"error":{"code":"private_relay_name","message":"m"}}"#)
+        })
+
+        await #expect(throws: APIError.privateRelayName(payload: APIErrorPayload(code: "private_relay_name", message: "m"))) {
+            _ = try await api.updateDisplayName("abc@privaterelay.appleid.com")
+        }
+    }
+
+    @Test func http400InvalidFieldStaysGeneric() async throws {
+        let api = makeAPI(handler: { _ in
+            StubResponses.http(400, body: #"{"error":{"code":"invalid_field","message":"m"}}"#)
+        })
+
+        await #expect(throws: APIError.http(status: 400, payload: APIErrorPayload(code: "invalid_field", message: "m"))) {
+            _ = try await api.updateDisplayName(" ")
         }
     }
 

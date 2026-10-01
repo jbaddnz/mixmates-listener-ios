@@ -285,7 +285,8 @@ struct ListenScreen: View {
         .sheet(isPresented: $showShareSheet) {
             TrackShareSheet(
                 historyId: result.historyId,
-                shareURL: result.track?.shareURL
+                shareURL: result.track?.shareURL,
+                onNameChosen: { viewModel.adoptProfile($0) }
             )
             .environmentObject(auth)
             .environmentObject(pushManager)
@@ -482,6 +483,14 @@ final class ListenScreenViewModel: ObservableObject {
         } catch {
             // Quiet failure — profile is non-essential.
         }
+    }
+
+    /// Take a profile changed elsewhere, such as a display name set from the
+    /// share sheet, so the greeting is current without fetching it again.
+    /// Dismissing a sheet does not rerun the screen's `.task`, so nothing
+    /// else would pick the change up.
+    func adoptProfile(_ profile: UserProfile) {
+        self.profile = profile
     }
 
     /// Drive the full record → recognise flow. Caller passes the current

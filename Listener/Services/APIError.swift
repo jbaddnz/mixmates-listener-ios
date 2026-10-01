@@ -36,6 +36,30 @@ enum APIError: Error, Equatable {
     /// team. Surfaced by `resolve` and `shareHistory`.
     case groupLocked(payload: APIErrorPayload?)
 
+    /// 403 with error code `name_required` — the account has no display
+    /// name of its own yet, so it cannot put anything where friends will
+    /// see it. Refuses the whole request; nothing was applied. Resolved in
+    /// place by `updateDisplayName(_:)` and one retry. Surfaced by
+    /// `shareHistory`.
+    case nameRequired(payload: APIErrorPayload?)
+
+    /// 403 with error code `not_found` — the caller is not a member of a
+    /// target group, usually because they left it. The status and code look
+    /// mismatched but that pairing is the server's contract. Surfaced by
+    /// `shareHistory`.
+    case notGroupMember(payload: APIErrorPayload?)
+
+    /// 403 with error code `auth_listen_disabled` — an admin has switched
+    /// listening off for this account. Comes from the server's shared auth
+    /// step, so any authenticated route can return it, and it is permanent:
+    /// no retry will succeed.
+    case listenDisabled(payload: APIErrorPayload?)
+
+    /// 400 with error code `private_relay_name` — the display name sent to
+    /// `updateDisplayName(_:)` is an Apple private-relay address. Kept apart
+    /// from a plain `invalid_field` so the app can say exactly what was wrong.
+    case privateRelayName(payload: APIErrorPayload?)
+
     /// Any other non-2xx status with the parsed error envelope, if present.
     case http(status: Int, payload: APIErrorPayload?)
 
@@ -54,7 +78,11 @@ enum APIError: Error, Equatable {
             return lr == rr && lrem == rrem
         case (.recognitionUnavailable, .recognitionUnavailable):
             return true
-        case (.groupLocked(let l), .groupLocked(let r)):
+        case (.groupLocked(let l), .groupLocked(let r)),
+             (.nameRequired(let l), .nameRequired(let r)),
+             (.notGroupMember(let l), .notGroupMember(let r)),
+             (.listenDisabled(let l), .listenDisabled(let r)),
+             (.privateRelayName(let l), .privateRelayName(let r)):
             return l == r
         case (.http(let ls, let lp), .http(let rs, let rp)):
             return ls == rs && lp == rp

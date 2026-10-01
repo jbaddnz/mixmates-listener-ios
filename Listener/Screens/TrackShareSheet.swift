@@ -36,11 +36,17 @@ struct TrackShareSheet: View {
     /// Empty from the recognition result, populated from Track Details.
     var alreadySharedTo: [String] = []
 
+    /// Called with the updated profile when the person sets a display name
+    /// from inside this sheet, so a presenter that shows the name can show
+    /// the new one without fetching it again.
+    var onNameChosen: (UserProfile) -> Void = { _ in }
+
     @EnvironmentObject private var auth: AuthState
     @EnvironmentObject private var pushManager: PushManager
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = TrackShareViewModel()
     @State private var showNotificationAsk = false
+    @State private var nameDraft = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -98,15 +104,17 @@ struct TrackShareSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
 
-        case .failed:
+        case .failed(let message, let retryable):
             VStack(alignment: .leading, spacing: 8) {
-                Text("Couldn't load your groups")
+                Text(message)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Button("Try again") {
-                    Task { await load() }
+                if retryable {
+                    Button("Try again") {
+                        Task { await load() }
+                    }
+                    .font(.callout)
                 }
-                .font(.callout)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -116,6 +124,14 @@ struct TrackShareSheet: View {
         case .loaded(let groups):
             if let results = viewModel.shareResults {
                 shareSuccessState(results: results, groups: groups)
+            } else if viewModel.isAskingForName {
+                DisplayNamePrompt(
+                    name: $nameDraft,
+                    isSaving: viewModel.isSavingName,
+                    error: viewModel.nameError,
+                    onSubmit: { Task { await submitName() } },
+                    onCancel: { viewModel.cancelNameEntry() }
+                )
             } else {
                 picker(groups: groups)
             }
@@ -273,6 +289,21 @@ struct TrackShareSheet: View {
         await offerNotificationsIfThisIsTheMoment()
     }
 
+    private func submitName() async {
+        guard let token = auth.token, let historyId else { return }
+        let profile = await viewModel.submitName(
+            nameDraft,
+            historyId: historyId,
+            token: token,
+            onUnauthorized: { @MainActor in auth.signOut() }
+        )
+        if let profile {
+            onNameChosen(profile)
+        }
+        guard viewModel.shareResults != nil else { return }
+        await offerNotificationsIfThisIsTheMoment()
+    }
+
     /// Raise the pre-permission card once a track has actually landed in a
     /// group, which is the point at which somebody else can add to it and
     /// there is finally something worth being told about.
@@ -309,10 +340,14 @@ final class TrackShareViewModel: ObservableObject {
     /// A failed fetch showing "No groups yet" would tell someone with ten
     /// groups that they have none, and in the planned creation flow it would
     /// offer to make another one on top of the ones they already have.
+    ///
+    /// A failure also says whether trying again can help. A disabled account
+    /// fails the same way every time, and a Try again button under it would
+    /// be a promise the app cannot keep.
     enum GroupsState: Equatable {
         case loading
         case loaded([HumanGroup])
-        case failed
+        case failed(message: String, retryable: Bool)
     }
 
     @Published private(set) var groupsState: GroupsState = .loading
@@ -320,6 +355,13 @@ final class TrackShareViewModel: ObservableObject {
     @Published private(set) var isSharing: Bool = false
     @Published private(set) var shareResults: [ShareResult]?
     @Published private(set) var shareError: String?
+
+    /// True once a share has been refused for want of a display name. The
+    /// sheet swaps the picker for `DisplayNamePrompt` while it holds, and the
+    /// selection is kept so the share can be retried without starting over.
+    @Published private(set) var isAskingForName: Bool = false
+    @Published private(set) var isSavingName: Bool = false
+    @Published private(set) var nameError: String?
 
     private let client: HTTPClient
 
@@ -355,11 +397,12 @@ final class TrackShareViewModel: ObservableObject {
             let available = Set(groups.map(\.id))
             groupsState = .loaded(groups)
             selectedGroupIds = Set(alreadySharedTo).intersection(available)
-        } catch APIError.unauthorized {
-            // Sign-out already fired from the API actor.
-            groupsState = .failed
+        } catch APIError.listenDisabled {
+            groupsState = .failed(message: ShareFlowCopy.listenDisabled, retryable: false)
         } catch {
-            groupsState = .failed
+            // Includes 401, where sign-out has already fired from the API
+            // actor and the sheet is about to go away.
+            groupsState = .failed(message: ShareFlowCopy.couldNotLoadGroups, retryable: true)
         }
     }
 
@@ -379,15 +422,70 @@ final class TrackShareViewModel: ObservableObject {
         onUnauthorized: @Sendable @escaping () async -> Void
     ) async {
         guard !selectedGroupIds.isEmpty else { return }
+        await performShare(
+            historyId: historyId,
+            token: token,
+            onUnauthorized: onUnauthorized,
+            mayAskForName: true
+        )
+    }
+
+    /// Save a display name after a share was refused for want of one, then
+    /// retry that share once.
+    ///
+    /// Returns the updated profile so the caller can refresh anything that
+    /// shows the name, or nil when the name was not saved. The retry may not
+    /// ask for a name again: if the server still refuses, something other
+    /// than the name is wrong and looping would hide it.
+    func submitName(
+        _ input: String,
+        historyId: String,
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void
+    ) async -> UserProfile? {
+        guard let name = UserProfile.validDisplayName(input) else { return nil }
+        isSavingName = true
+        nameError = nil
+        defer { isSavingName = false }
+
+        let api = makeAPI(token: token, onUnauthorized: onUnauthorized)
+        let profile: UserProfile
+        do {
+            profile = try await api.updateDisplayName(name)
+        } catch APIError.unauthorized {
+            return nil
+        } catch {
+            nameError = ShareFlowCopy.nameSaveFailure(error)
+            return nil
+        }
+
+        isAskingForName = false
+        await performShare(
+            historyId: historyId,
+            token: token,
+            onUnauthorized: onUnauthorized,
+            mayAskForName: false
+        )
+        return profile
+    }
+
+    /// Leave the name prompt and go back to the picker, selection intact.
+    func cancelNameEntry() {
+        isAskingForName = false
+        nameError = nil
+    }
+
+    private func performShare(
+        historyId: String,
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void,
+        mayAskForName: Bool
+    ) async {
         isSharing = true
         shareError = nil
         defer { isSharing = false }
 
-        let api = ListenerAPI(
-            client: client,
-            tokenProvider: { token },
-            onUnauthorized: onUnauthorized
-        )
+        let api = makeAPI(token: token, onUnauthorized: onUnauthorized)
 
         do {
             let outcome = try await api.shareHistory(
@@ -397,11 +495,27 @@ final class TrackShareViewModel: ObservableObject {
             shareResults = outcome.results
         } catch APIError.unauthorized {
             // Already handled by the callback.
-        } catch APIError.groupLocked {
-            shareError = "This group is no longer accepting new tracks"
+        } catch APIError.nameRequired where mayAskForName {
+            isAskingForName = true
+        } catch APIError.notGroupMember {
+            // Reload so the group they left drops out of the picker and out
+            // of the selection, and Share does not post it again.
+            shareError = ShareFlowCopy.notGroupMember
+            await load(
+                preselecting: Array(selectedGroupIds),
+                token: token,
+                onUnauthorized: onUnauthorized
+            )
         } catch {
-            shareError = "Couldn't share. Try again."
+            shareError = ShareFlowCopy.shareFailure(error)
         }
+    }
+
+    private func makeAPI(
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void
+    ) -> ListenerAPI {
+        ListenerAPI(client: client, tokenProvider: { token }, onUnauthorized: onUnauthorized)
     }
 
     /// Return from the post-share state to the picker.

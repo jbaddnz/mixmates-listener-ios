@@ -28,6 +28,13 @@ final class ShareViewModel: ObservableObject {
     @Published private(set) var shareResults: [ShareResult]?
     @Published private(set) var shareError: String?
 
+    /// Same name flow as the app's share sheet: a share refused for want of
+    /// a display name swaps the picker for `DisplayNamePrompt`, keeps the
+    /// selection, and retries once the name is saved.
+    @Published private(set) var isAskingForName = false
+    @Published private(set) var isSavingName = false
+    @Published private(set) var nameError: String?
+
     private let token: String?
     private let dismiss: () -> Void
     private var api: ListenerAPI?
@@ -77,7 +84,9 @@ final class ShareViewModel: ObservableObject {
             case .network:
                 state = .error("No internet connection.")
             case .groupLocked:
-                state = .error("This group is no longer accepting new tracks")
+                state = .error(ShareFlowCopy.groupLocked)
+            case .listenDisabled:
+                state = .error(ShareFlowCopy.listenDisabled)
             case .http(_, let payload):
                 state = .error(payload?.message ?? "Couldn't resolve this link.")
             default:
@@ -99,7 +108,36 @@ final class ShareViewModel: ObservableObject {
     }
 
     func share() async {
-        guard let api, let historyId, !selectedGroupIds.isEmpty else { return }
+        guard !selectedGroupIds.isEmpty else { return }
+        await performShare(mayAskForName: true)
+    }
+
+    /// Save a display name, then retry the refused share once. The retry
+    /// may not ask again, so a second refusal is reported, not looped on.
+    func submitName(_ input: String) async {
+        guard let api, let name = UserProfile.validDisplayName(input) else { return }
+        isSavingName = true
+        nameError = nil
+        defer { isSavingName = false }
+
+        do {
+            _ = try await api.updateDisplayName(name)
+        } catch {
+            nameError = ShareFlowCopy.nameSaveFailure(error)
+            return
+        }
+
+        isAskingForName = false
+        await performShare(mayAskForName: false)
+    }
+
+    func cancelNameEntry() {
+        isAskingForName = false
+        nameError = nil
+    }
+
+    private func performShare(mayAskForName: Bool) async {
+        guard let api, let historyId else { return }
         isSharing = true
         shareError = nil
         defer { isSharing = false }
@@ -110,10 +148,20 @@ final class ShareViewModel: ObservableObject {
                 groupIds: Array(selectedGroupIds)
             )
             shareResults = outcome.results
-        } catch APIError.groupLocked {
-            shareError = "This group is no longer accepting new tracks"
+        } catch APIError.nameRequired where mayAskForName {
+            isAskingForName = true
+        } catch APIError.notGroupMember {
+            // Reload so the group they left drops out of the list and the
+            // selection. If the reload fails, keep what is on screen.
+            shareError = ShareFlowCopy.notGroupMember
+            do {
+                groups = try await api.groups()
+                selectedGroupIds.formIntersection(groups.map(\.id))
+            } catch {
+                // Non-fatal: the message has already said what happened.
+            }
         } catch {
-            shareError = "Couldn't share. Try again."
+            shareError = ShareFlowCopy.shareFailure(error)
         }
     }
 
@@ -127,6 +175,7 @@ final class ShareViewModel: ObservableObject {
 struct ShareView: View {
 
     @ObservedObject var viewModel: ShareViewModel
+    @State private var nameDraft = ""
 
     var body: some View {
         NavigationView {
@@ -261,7 +310,23 @@ struct ShareView: View {
 
     // MARK: - Share to groups
 
+    @ViewBuilder
     private var shareToGroupsSection: some View {
+        if viewModel.isAskingForName {
+            DisplayNamePrompt(
+                name: $nameDraft,
+                isSaving: viewModel.isSavingName,
+                error: viewModel.nameError,
+                onSubmit: { Task { await viewModel.submitName(nameDraft) } },
+                onCancel: { viewModel.cancelNameEntry() }
+            )
+            .padding(.horizontal)
+        } else {
+            groupPicker
+        }
+    }
+
+    private var groupPicker: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Share to group")
                 .font(.headline)

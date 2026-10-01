@@ -66,6 +66,7 @@
 		7DD9EC072F95D586002C1DDC /* Exceptions for "Listener" folder in "ListenerShare" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Components/DisplayNamePrompt.swift,
 				Models/APIEnvelope.swift,
 				Models/Auth.swift,
 				Models/Health.swift,
@@ -82,6 +83,7 @@
 				Services/HTTPClient.swift,
 				Services/KeychainManager.swift,
 				Services/ListenerAPI.swift,
+				Services/ShareFlowCopy.swift,
 			);
 			target = 7DD9EBF42F95D368002C1DDC /* ListenerShare */;
 		};

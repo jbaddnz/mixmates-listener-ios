@@ -48,6 +48,23 @@ actor ListenerAPI {
         return UserProfile(dto: dto)
     }
 
+    /// Set the display name friends see. Returns the updated profile, the
+    /// same shape `me()` returns.
+    func updateDisplayName(_ displayName: String) async throws -> UserProfile {
+        struct Body: Encodable {
+            let displayName: String
+            enum CodingKeys: String, CodingKey { case displayName = "display_name" }
+        }
+        let body = try JSONEncoder().encode(Body(displayName: displayName))
+        let dto: UserDTO = try await request(
+            path: "auth/me",
+            method: "PATCH",
+            body: body,
+            contentType: "application/json"
+        )
+        return UserProfile(dto: dto)
+    }
+
     func recognize(audio: Data, mimeType: String, filename: String = "recording.m4a") async throws -> RecognitionResult {
         let boundary = "Boundary-\(UUID().uuidString)"
         var body = Data()
@@ -265,10 +282,27 @@ actor ListenerAPI {
         case 502:
             throw APIError.recognitionUnavailable
 
+        // A 403 carries several refusals that need different words and
+        // different recovery, so key on the code rather than the status.
         case 403:
             let payload = decodeErrorPayload(data)
-            if payload?.code == "group_locked" {
+            switch payload?.code {
+            case "group_locked":
                 throw APIError.groupLocked(payload: payload)
+            case "name_required":
+                throw APIError.nameRequired(payload: payload)
+            case "not_found":
+                throw APIError.notGroupMember(payload: payload)
+            case "auth_listen_disabled":
+                throw APIError.listenDisabled(payload: payload)
+            default:
+                throw APIError.http(status: http.statusCode, payload: payload)
+            }
+
+        case 400:
+            let payload = decodeErrorPayload(data)
+            if payload?.code == "private_relay_name" {
+                throw APIError.privateRelayName(payload: payload)
             }
             throw APIError.http(status: http.statusCode, payload: payload)
 

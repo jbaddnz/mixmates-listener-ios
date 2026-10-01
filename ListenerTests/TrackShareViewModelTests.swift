@@ -92,7 +92,7 @@ struct TrackShareViewModelTests {
 
         await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
 
-        #expect(viewModel.groupsState == .failed)
+        #expect(viewModel.groupsState == .failed(message: ShareFlowCopy.couldNotLoadGroups, retryable: true))
         #expect(loadedGroups(viewModel.groupsState) == nil)
     }
 
@@ -109,7 +109,7 @@ struct TrackShareViewModelTests {
         )
 
         #expect(await signal.fired)
-        #expect(viewModel.groupsState == .failed)
+        #expect(viewModel.groupsState == .failed(message: ShareFlowCopy.couldNotLoadGroups, retryable: true))
     }
 
     // MARK: - Selection
@@ -225,6 +225,205 @@ struct TrackShareViewModelTests {
 
         #expect(viewModel.shareResults == nil)
     }
+
+    // MARK: - Refusals that a retry cannot fix
+
+    /// A disabled account fails the same way every time, so the failed
+    /// state must not carry a Try again that can never work.
+    @Test func loadListenDisabledIsNotRetryable() async throws {
+        let viewModel = makeViewModel(handler: { _ in
+            StubResponses.http(403, body: Self.errorBody("auth_listen_disabled"))
+        })
+
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        #expect(viewModel.groupsState == .failed(message: ShareFlowCopy.listenDisabled, retryable: false))
+    }
+
+    @Test func shareListenDisabledShowsItsOwnMessage() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            if request.httpMethod == "POST" {
+                return StubResponses.http(403, body: Self.errorBody("auth_listen_disabled"))
+            }
+            return StubResponses.ok(Fixtures.groups)
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.shareError == ShareFlowCopy.listenDisabled)
+    }
+
+    /// Someone who has left a group gets told so, and the group drops out of
+    /// the picker and the selection on the reload, so Share cannot post it
+    /// again.
+    @Test func shareNotGroupMemberSaysSoAndDropsTheGroup() async throws {
+        let groupsLoads = CallCounter()
+        let viewModel = makeViewModel(handler: { request in
+            if request.httpMethod == "POST" {
+                return StubResponses.http(403, body: Self.errorBody("not_found"))
+            }
+            // The second load no longer lists g2.
+            return groupsLoads.next() == 1
+                ? StubResponses.ok(Fixtures.groups)
+                : StubResponses.ok(#"{ "data": { "items": [ { "id": "g1", "name": "Wellington Batucada", "description": null } ] } }"#)
+        })
+        await viewModel.load(preselecting: ["g1", "g2"], token: "t", onUnauthorized: {})
+
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.shareError == ShareFlowCopy.notGroupMember)
+        #expect(loadedGroups(viewModel.groupsState)?.map(\.id) == ["g1"])
+        #expect(viewModel.selectedGroupIds == ["g1"])
+    }
+
+    // MARK: - Names
+
+    @Test func shareNameRequiredAsksForANameAndKeepsTheSelection() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            if request.httpMethod == "POST" {
+                return StubResponses.http(403, body: Self.errorBody("name_required"))
+            }
+            return StubResponses.ok(Fixtures.groups)
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.isAskingForName)
+        #expect(viewModel.shareError == nil)
+        #expect(viewModel.selectedGroupIds == ["g1"])
+    }
+
+    /// The whole point of the prompt: one name, then the refused share goes
+    /// through without the person starting again.
+    @Test func submitNameSavesItThenRetriesTheShare() async throws {
+        let log = RequestLog()
+        let shares = CallCounter()
+        let viewModel = makeViewModel(handler: { request in
+            log.append(request)
+            switch request.httpMethod {
+            case "PATCH":
+                return StubResponses.ok(Fixtures.authMe)
+            case "POST":
+                return shares.next() == 1
+                    ? StubResponses.http(403, body: Self.errorBody("name_required"))
+                    : StubResponses.ok(Fixtures.share)
+            default:
+                return StubResponses.ok(Fixtures.groups)
+            }
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        let profile = await viewModel.submitName("  Jamie  ", historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(profile?.displayName == "Jamie")
+        #expect(viewModel.isAskingForName == false)
+        #expect(viewModel.shareResults != nil)
+        #expect(log.methods == ["GET", "POST", "PATCH", "POST"])
+        let patchBody = log.requests[2].httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(patchBody?["display_name"] as? String == "Jamie")
+    }
+
+    /// Retried once, not in a loop. If the server still refuses after the
+    /// name is saved, something else is wrong and asking again would hide it.
+    @Test func submitNameRetriesOnlyOnce() async throws {
+        let log = RequestLog()
+        let viewModel = makeViewModel(handler: { request in
+            log.append(request)
+            switch request.httpMethod {
+            case "PATCH": return StubResponses.ok(Fixtures.authMe)
+            case "POST": return StubResponses.http(403, body: Self.errorBody("name_required"))
+            default: return StubResponses.ok(Fixtures.groups)
+            }
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        _ = await viewModel.submitName("Jamie", historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.isAskingForName == false)
+        #expect(viewModel.shareError == ShareFlowCopy.couldNotShare)
+        #expect(log.methods.filter { $0 == "POST" }.count == 2)
+    }
+
+    @Test func submitNamePrivateRelayShowsItsCopyAndStaysInTheField() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            switch request.httpMethod {
+            case "PATCH": return StubResponses.http(400, body: Self.errorBody("private_relay_name"))
+            case "POST": return StubResponses.http(403, body: Self.errorBody("name_required"))
+            default: return StubResponses.ok(Fixtures.groups)
+            }
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        let profile = await viewModel.submitName("abc@privaterelay.appleid.com", historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(profile == nil)
+        #expect(viewModel.isAskingForName)
+        #expect(viewModel.nameError == ShareFlowCopy.privateRelayName)
+    }
+
+    /// The relay copy is for the relay refusal only. A plain bad value must
+    /// not tell someone they typed an Apple address.
+    @Test func submitNameInvalidFieldDoesNotShowTheRelayCopy() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            switch request.httpMethod {
+            case "PATCH": return StubResponses.http(400, body: Self.errorBody("invalid_field"))
+            case "POST": return StubResponses.http(403, body: Self.errorBody("name_required"))
+            default: return StubResponses.ok(Fixtures.groups)
+            }
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        _ = await viewModel.submitName("Jamie", historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.nameError == ShareFlowCopy.couldNotSaveName)
+    }
+
+    @Test func submitNameIgnoresABlankName() async throws {
+        let log = RequestLog()
+        let viewModel = makeViewModel(handler: { request in
+            log.append(request)
+            if request.httpMethod == "POST" {
+                return StubResponses.http(403, body: Self.errorBody("name_required"))
+            }
+            return StubResponses.ok(Fixtures.groups)
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        let profile = await viewModel.submitName("   ", historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(profile == nil)
+        #expect(log.methods.contains("PATCH") == false)
+        #expect(viewModel.isAskingForName)
+    }
+
+    @Test func cancelNameEntryReturnsToThePickerWithTheSelection() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            if request.httpMethod == "POST" {
+                return StubResponses.http(403, body: Self.errorBody("name_required"))
+            }
+            return StubResponses.ok(Fixtures.groups)
+        })
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+        await viewModel.share(historyId: "h_1", token: "t", onUnauthorized: {})
+
+        viewModel.cancelNameEntry()
+
+        #expect(viewModel.isAskingForName == false)
+        #expect(viewModel.selectedGroupIds == ["g1"])
+    }
+
+    /// Static so the `@Sendable` stub handlers can reach it; an instance
+    /// helper would inherit the suite's main-actor isolation.
+    private nonisolated static func errorBody(_ code: String) -> String {
+        #"{"error":{"code":"\#(code)","message":"m"}}"#
+    }
 }
 
 // MARK: - Test helpers
@@ -248,4 +447,13 @@ private final class CallCounter: @unchecked Sendable {
         count += 1
         return count
     }
+}
+
+/// Every request a stub saw, in order. Unchecked-`Sendable` like
+/// `CallCounter`: the view model awaits each call before making the next,
+/// so the stub handler never runs twice at once.
+private final class RequestLog: @unchecked Sendable {
+    private(set) var requests: [URLRequest] = []
+    var methods: [String] { requests.map { $0.httpMethod ?? "" } }
+    func append(_ request: URLRequest) { requests.append(request) }
 }

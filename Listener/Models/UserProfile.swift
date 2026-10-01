@@ -45,4 +45,16 @@ struct UserProfile: Equatable {
         self.listenEnabled = dto.user.listenEnabled
         self.preferredPlatform = dto.user.preferredPlatform
     }
+
+    /// The server's limit on a display name, counted after trimming.
+    static let displayNameMaxLength = 100
+
+    /// The name as it would be sent to `updateDisplayName(_:)`, trimmed, or
+    /// nil when the server would refuse it as empty or too long. Checked
+    /// before sending so the common mistakes never cost a round trip.
+    static func validDisplayName(_ input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= displayNameMaxLength else { return nil }
+        return trimmed
+    }
 }
