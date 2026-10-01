@@ -223,28 +223,27 @@ struct TrackShareSheet: View {
 
     private func picker(groups: [HumanGroup], canCreate: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            // The demo group, or a friend's group the person joined, means
+            // the list is usually not empty, so Start a group has to show
+            // beside it rather than only in the empty state. First in the
+            // sheet, matching Android.
+            if canCreate {
+                Button {
+                    viewModel.startGroup()
+                } label: {
+                    Text(ShareFlowCopy.startGroup)
+                        .brandCapsule(looksEnabled: viewModel.isStartGroupEnabled)
+                }
+                .disabled(!viewModel.isStartGroupEnabled)
+                .padding(.bottom, 4)
+            }
+
             Text("Share to groups")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(groups) { group in
                     pickerRow(group)
-                }
-
-                // The demo group, or a friend's group the person joined,
-                // means the list is usually not empty, so Start a group has
-                // to sit beside it rather than only in the empty state.
-                // Brand-coloured text rather than a full capsule: a second
-                // hero button stacked on Share would compete with it.
-                if canCreate {
-                    Button {
-                        viewModel.startGroup()
-                    } label: {
-                        Label(ShareFlowCopy.startGroup, systemImage: "plus.circle")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(LinearGradient.mixmatesBrand)
-                    }
-                    .padding(.top, 4)
                 }
             }
 
@@ -607,6 +606,18 @@ final class TrackShareViewModel: ObservableObject {
 
     @Published private(set) var isCreatingGroup: Bool = false
     @Published private(set) var createError: String?
+
+    /// Start a group beside a non-empty picker steps back once any group is
+    /// ticked: the person has chosen where the track goes, and Share is the
+    /// next step. While Start shows, `canCreate` is true, so every listed
+    /// group is one they joined rather than made.
+    ///
+    /// Matches Android. A track opened from History detail arrives with the
+    /// groups it is already in ticked, so there Start begins dimmed until
+    /// they are unticked; a known and accepted consequence.
+    var isStartGroupEnabled: Bool {
+        selectedGroupIds.isEmpty
+    }
 
     /// True while the display-name prompt is up. The selection is kept, so a
     /// refused share can be retried without starting over.

@@ -462,6 +462,31 @@ struct TrackShareViewModelTests {
         #expect(loadedList(viewModel.groupsState) == nil)
     }
 
+    /// Start steps back once any group is ticked, and comes back when
+    /// everything is unticked.
+    @Test func startGroupDimsWhileAnyGroupIsTicked() async throws {
+        let viewModel = makeViewModel(handler: { _ in StubResponses.ok(Fixtures.groupsWithCreate) })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+        #expect(viewModel.isStartGroupEnabled)
+
+        viewModel.toggleGroup("g1")
+        #expect(viewModel.isStartGroupEnabled == false)
+
+        viewModel.toggleGroup("g1")
+        #expect(viewModel.isStartGroupEnabled)
+    }
+
+    /// From History detail the track's existing groups arrive ticked, so
+    /// Start begins dimmed. Known and accepted; pinned so a change to it is
+    /// deliberate.
+    @Test func startGroupBeginsDimmedWhenGroupsArrivePreselected() async throws {
+        let viewModel = makeViewModel(handler: { _ in StubResponses.ok(Fixtures.groupsWithCreate) })
+
+        await viewModel.load(preselecting: ["g1"], token: "t", onUnauthorized: {})
+
+        #expect(viewModel.isStartGroupEnabled == false)
+    }
+
     // MARK: - Starting a group
 
     /// After a create: the success moment with the new group's invite link,
