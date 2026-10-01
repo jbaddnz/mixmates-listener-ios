@@ -132,11 +132,7 @@ struct TrackCard: View {
 
     private var shareHero: some View {
         Label("Share", systemImage: "square.and.arrow.up")
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Capsule().fill(LinearGradient.mixmatesBrand))
+            .brandCapsule()
     }
 
     @ViewBuilder

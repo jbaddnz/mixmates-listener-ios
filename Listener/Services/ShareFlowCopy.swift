@@ -52,16 +52,14 @@ enum ShareFlowCopy {
     static let groupReady = "Your group is ready"
     static let inviteAFriend = "Invite a friend"
     static let shareTrackToNewGroup = "Share this track to it"
-    static let inviteMessageAfterCreate = "I started a group on MixMates. Join me:"
+    /// Sent with the new group's link after a create. No trailing colon:
+    /// iOS hands the link to the receiving app separately, and Messages puts
+    /// its preview card above the text, so a colon would point at nothing.
+    /// Android, which appends the link to the text, keeps one.
+    static let inviteMessageAfterCreate = "I started a group on MixMates. Join me"
     static let nameTaken = "That name's taken. Try adding something of your own to it."
     static let alreadyHasGroup = "This account already has a group."
     static let couldNotStartGroup = "Couldn't start the group. Try again."
-
-    /// Sent with a group's invite link from its picker row. The group may be
-    /// a friend's, so it is named rather than called "my group".
-    static func inviteMessage(for groupName: String) -> String {
-        "Join \(groupName) on MixMates:"
-    }
 
     /// Names the group, so VoiceOver does not read the same label on every
     /// row.

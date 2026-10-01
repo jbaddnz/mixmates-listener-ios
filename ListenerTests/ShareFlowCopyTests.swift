@@ -15,10 +15,9 @@ import Foundation
 @Suite("ShareFlowCopy")
 struct ShareFlowCopyTests {
 
-    /// The fixed strings plus the ones built around a group name, filled
-    /// with a sample, so the rules cover what is actually shown and sent.
+    /// The fixed strings plus the one built around a group name, filled
+    /// with a sample, so the rules cover what is actually shown.
     static let everyString = ShareFlowCopy.all + [
-        ShareFlowCopy.inviteMessage(for: "Kitchen Disco"),
         ShareFlowCopy.inviteAccessibilityLabel(for: "Kitchen Disco"),
     ]
 
@@ -65,10 +64,16 @@ struct ShareFlowCopyTests {
         #expect(ShareFlowCopy.createFailure(APIError.network(URLError(.timedOut))) == ShareFlowCopy.couldNotStartGroup)
     }
 
-    /// The row invite names the group, because the group may be a friend's.
-    @Test func inviteFromARowNamesTheGroup() {
-        #expect(ShareFlowCopy.inviteMessage(for: "Kitchen Disco") == "Join Kitchen Disco on MixMates:")
+    /// Each row's Invite names its group, so VoiceOver does not read the
+    /// same label down the list.
+    @Test func inviteAccessibilityLabelNamesTheGroup() {
         #expect(ShareFlowCopy.inviteAccessibilityLabel(for: "Kitchen Disco") == "Invite a friend to Kitchen Disco")
+    }
+
+    /// iOS hands the link over separately and Messages shows its card above
+    /// the text, so a trailing colon would point at nothing.
+    @Test func inviteMessageAfterCreateDoesNotEndInAColon() {
+        #expect(ShareFlowCopy.inviteMessageAfterCreate.hasSuffix(":") == false)
     }
 
     /// A rate limit must not say "Try again", the one thing that will not

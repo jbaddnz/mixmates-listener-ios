@@ -50,9 +50,14 @@ struct TrackShareSheet: View {
     @State private var groupNameDraft = ""
     @FocusState private var isGroupNameFocused: Bool
 
+    /// The sheet's height when it fits its content, measured on every
+    /// layout. Nil until the first measurement, when the sheet uses medium.
+    @State private var fittedHeight: CGFloat?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+                .measuringFittedHeight()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -69,9 +74,31 @@ struct TrackShareSheet: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 24)
+                .measuringFittedHeight()
             }
         }
-        .presentationDetents([.medium, .large])
+        .background {
+            // The bottom safe area sits inside the sheet's height too. Read
+            // with the keyboard ignored, so only the home indicator area
+            // counts and never the keyboard itself.
+            GeometryReader { proxy in
+                Color.clear.preference(key: FittedHeightKey.self, value: proxy.safeAreaInsets.bottom)
+            }
+            .ignoresSafeArea(.keyboard)
+        }
+        // Sit at the height of what is showing, so a short state such as
+        // "Your group is ready" is not stranded at the top of a half-screen
+        // of empty sheet.
+        //
+        // The fitted height is the only detent. With a larger one on offer,
+        // iOS moves the sheet up to it as soon as a text field takes the
+        // keyboard, so naming a group would open a near-full-height sheet.
+        // A long group list loses nothing: the height is capped at the
+        // screen and the content scrolls.
+        .onPreferenceChange(FittedHeightKey.self) { height in
+            fittedHeight = height
+        }
+        .presentationDetents(fittedHeight.map { [.height($0)] } ?? [.medium])
         .task { await load() }
     }
 
@@ -259,11 +286,11 @@ struct TrackShareSheet: View {
             }
             .buttonStyle(.plain)
 
+            // The link alone, with no message. The invite page's own preview
+            // card already reads "Join {group} on MixMates", so any sentence
+            // here would only repeat it under the card.
             if let inviteURL = group.inviteURL {
-                ShareLink(
-                    item: inviteURL,
-                    message: Text(ShareFlowCopy.inviteMessage(for: group.name))
-                ) {
+                ShareLink(item: inviteURL) {
                     Image(systemName: "person.badge.plus")
                 }
                 .accessibilityLabel(ShareFlowCopy.inviteAccessibilityLabel(for: group.name))
@@ -299,15 +326,21 @@ struct TrackShareSheet: View {
             Button {
                 Task { await createGroup() }
             } label: {
-                if viewModel.isCreatingGroup {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text(ShareFlowCopy.createSubmit)
-                        .frame(maxWidth: .infinity)
+                Group {
+                    if viewModel.isCreatingGroup {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text(ShareFlowCopy.createSubmit)
+                    }
                 }
+                .brandCapsule()
+                // The capsule's colours are explicit, so the system does not
+                // dim them when the button is disabled. Fade it by hand so an
+                // empty name does not look tappable. Not while creating,
+                // where the spinner already says it is working.
+                .opacity(canSubmit || viewModel.isCreatingGroup ? 1 : 0.4)
             }
-            .buttonStyle(.borderedProminent)
             .disabled(!canSubmit)
 
             if let error = viewModel.createError {
@@ -345,9 +378,8 @@ struct TrackShareSheet: View {
                     message: Text(ShareFlowCopy.inviteMessageAfterCreate)
                 ) {
                     Label(ShareFlowCopy.inviteAFriend, systemImage: "person.badge.plus")
-                        .frame(maxWidth: .infinity)
+                        .brandCapsule()
                 }
-                .buttonStyle(.borderedProminent)
             }
 
             Button(ShareFlowCopy.shareTrackToNewGroup) {
@@ -487,6 +519,27 @@ struct TrackShareSheet: View {
 
         NotificationAskPolicy.recordAsked()
         showNotificationAsk = true
+    }
+}
+
+// MARK: - Fitting the sheet to its content
+
+/// Sums the heights of the pieces that make up the sheet: the header, the
+/// scrolling content at its natural size, and the bottom safe area.
+private struct FittedHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value += nextValue()
+    }
+}
+
+private extension View {
+    func measuringFittedHeight() -> some View {
+        background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: FittedHeightKey.self, value: proxy.size.height)
+            }
+        }
     }
 }
 
@@ -762,7 +815,7 @@ final class TrackShareViewModel: ObservableObject {
         do {
             list = try await api.groups()
         } catch {
-            guard let created, case .loaded(let current) = groupsState else { return }
+            guard created != nil, case .loaded(let current) = groupsState else { return }
             list = GroupList(groups: current.groups, canCreate: false)
         }
         if let created, !list.groups.contains(where: { $0.id == created.id }) {

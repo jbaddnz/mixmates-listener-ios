@@ -19,12 +19,26 @@ extension Color {
 }
 
 /// MixMates brand gradient: Spotify-green to cyan, leading-to-trailing.
-/// Used by the Listen screen mic button (`Circle().fill(...)`) and the
-/// recording-progress ring stroke.
+/// Used by the Listen screen mic button (`Circle().fill(...)`), the
+/// recording-progress ring stroke, and `brandCapsule()`.
 extension LinearGradient {
     static let mixmatesBrand = LinearGradient(
         colors: [.mixmatesGreen, .mixmatesCyan],
         startPoint: .leading,
         endPoint: .trailing
     )
+}
+
+extension View {
+    /// The full-width gradient capsule for a screen's one hero action, such
+    /// as Share on the track card or Invite a friend after starting a group.
+    /// Applied to a button's label rather than as a button style, so it works
+    /// the same inside `Button` and `ShareLink`.
+    func brandCapsule() -> some View {
+        font(.callout.weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Capsule().fill(LinearGradient.mixmatesBrand))
+    }
 }
