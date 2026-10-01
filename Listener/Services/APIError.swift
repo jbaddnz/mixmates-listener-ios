@@ -60,6 +60,18 @@ enum APIError: Error, Equatable {
     /// from a plain `invalid_field` so the app can say exactly what was wrong.
     case privateRelayName(payload: APIErrorPayload?)
 
+    /// 403 with error code `already_has_group` — this account already owns a
+    /// group, so it cannot start another. Usually a second device, or a list
+    /// fetched before a group was started elsewhere. Surfaced by
+    /// `createGroup`.
+    case alreadyHasGroup(payload: APIErrorPayload?)
+
+    /// 409 with error code `name_taken` — another group already has that
+    /// name, compared without regard to case or spacing. App-started groups
+    /// cannot be found by anyone, so the clash is with a group the person
+    /// cannot see. Surfaced by `createGroup`.
+    case nameTaken(payload: APIErrorPayload?)
+
     /// Any other non-2xx status with the parsed error envelope, if present.
     case http(status: Int, payload: APIErrorPayload?)
 
@@ -82,7 +94,9 @@ enum APIError: Error, Equatable {
              (.nameRequired(let l), .nameRequired(let r)),
              (.notGroupMember(let l), .notGroupMember(let r)),
              (.listenDisabled(let l), .listenDisabled(let r)),
-             (.privateRelayName(let l), .privateRelayName(let r)):
+             (.privateRelayName(let l), .privateRelayName(let r)),
+             (.alreadyHasGroup(let l), .alreadyHasGroup(let r)),
+             (.nameTaken(let l), .nameTaken(let r)):
             return l == r
         case (.http(let ls, let lp), .http(let rs, let rp)):
             return ls == rs && lp == rp

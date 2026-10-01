@@ -72,7 +72,7 @@ final class ShareViewModel: ObservableObject {
 
             // Fetch groups for the share-to-group picker
             do {
-                groups = try await api.groups()
+                groups = try await api.groups().groups
             } catch {
                 // Non-fatal — the user can still see the result, just
                 // can't share to groups.
@@ -155,7 +155,7 @@ final class ShareViewModel: ObservableObject {
             // selection. If the reload fails, keep what is on screen.
             shareError = ShareFlowCopy.notGroupMember
             do {
-                groups = try await api.groups()
+                groups = try await api.groups().groups
                 selectedGroupIds.formIntersection(groups.map(\.id))
             } catch {
                 // Non-fatal: the message has already said what happened.

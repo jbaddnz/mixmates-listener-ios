@@ -5,7 +5,8 @@
 
 import Foundation
 
-/// Every user-facing string in the share-into-a-group flow, in one place.
+/// Every user-facing string in the share-into-a-group flow, including
+/// starting a group and inviting to one, in one place.
 ///
 /// Gathered here rather than left as inline literals so a test can
 /// enumerate them and pin the copy rules: no website named, nothing that
@@ -37,11 +38,57 @@ enum ShareFlowCopy {
     /// that will not work.
     static let tooManyTries = "Too many tries. Try again later."
 
+    /// The display-name submit when the refused action was starting a group,
+    /// where "Save and share" would promise something that is not happening.
+    static let nameSubmitSave = "Save"
+
+    // MARK: Starting a group
+
+    static let startGroup = "Start a group"
+    static let startGroupHint = "Make a group, then send your friends the invite link."
+    static let groupNamePlaceholder = "Name your group"
+    static let createSubmit = "Create"
+    static let createCancel = "Cancel"
+    static let groupReady = "Your group is ready"
+    static let inviteAFriend = "Invite a friend"
+    static let shareTrackToNewGroup = "Share this track to it"
+    static let inviteMessageAfterCreate = "I started a group on MixMates. Join me:"
+    static let nameTaken = "That name's taken. Try adding something of your own to it."
+    static let alreadyHasGroup = "This account already has a group."
+    static let couldNotStartGroup = "Couldn't start the group. Try again."
+
+    /// Sent with a group's invite link from its picker row. The group may be
+    /// a friend's, so it is named rather than called "my group".
+    static func inviteMessage(for groupName: String) -> String {
+        "Join \(groupName) on MixMates:"
+    }
+
+    /// Names the group, so VoiceOver does not read the same label on every
+    /// row.
+    static func inviteAccessibilityLabel(for groupName: String) -> String {
+        "Invite a friend to \(groupName)"
+    }
+
     static let all: [String] = [
         couldNotLoadGroups, couldNotShare, groupLocked, notGroupMember, listenDisabled,
         namePrompt, nameHint, namePlaceholder, nameSubmit, nameCancel,
-        privateRelayName, couldNotSaveName, tooManyTries,
+        privateRelayName, couldNotSaveName, tooManyTries, nameSubmitSave,
+        startGroup, startGroupHint, groupNamePlaceholder, createSubmit, createCancel,
+        groupReady, inviteAFriend, shareTrackToNewGroup, inviteMessageAfterCreate,
+        nameTaken, alreadyHasGroup, couldNotStartGroup,
     ]
+
+    /// The message for a group the server would not create, other than for a
+    /// missing display name, which is resolved in place.
+    static func createFailure(_ error: Error) -> String {
+        switch error {
+        case APIError.nameTaken: return nameTaken
+        case APIError.alreadyHasGroup: return alreadyHasGroup
+        case APIError.listenDisabled: return listenDisabled
+        case APIError.rateLimited: return tooManyTries
+        default: return couldNotStartGroup
+        }
+    }
 
     /// The message for a display name the server would not save.
     static func nameSaveFailure(_ error: Error) -> String {

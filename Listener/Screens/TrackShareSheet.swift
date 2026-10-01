@@ -47,6 +47,8 @@ struct TrackShareSheet: View {
     @StateObject private var viewModel = TrackShareViewModel()
     @State private var showNotificationAsk = false
     @State private var nameDraft = ""
+    @State private var groupNameDraft = ""
+    @FocusState private var isGroupNameFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -118,32 +120,49 @@ struct TrackShareSheet: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-        case .loaded(let groups) where groups.isEmpty:
-            emptyState
+        case .loaded(let list):
+            loadedSection(list)
+        }
+    }
 
-        case .loaded(let groups):
-            if let results = viewModel.shareResults {
-                shareSuccessState(results: results, groups: groups)
-            } else if viewModel.isAskingForName {
+    @ViewBuilder
+    private func loadedSection(_ list: GroupList) -> some View {
+        if let results = viewModel.shareResults {
+            shareSuccessState(results: results, groups: list.groups)
+        } else {
+            switch viewModel.panel {
+            case .askingForName(let refused):
                 DisplayNamePrompt(
                     name: $nameDraft,
                     isSaving: viewModel.isSavingName,
                     error: viewModel.nameError,
+                    submitLabel: refused == .share ? ShareFlowCopy.nameSubmit : ShareFlowCopy.nameSubmitSave,
                     onSubmit: { Task { await submitName() } },
                     onCancel: { viewModel.cancelNameEntry() }
                 )
-            } else {
-                picker(groups: groups)
+
+            case .startingGroup:
+                startGroupForm(canCreate: list.canCreate)
+
+            case .groupCreated(let group):
+                groupCreatedState(group)
+
+            case .picker:
+                if list.groups.isEmpty {
+                    if list.canCreate {
+                        emptyStartGroup
+                    } else {
+                        emptyState
+                    }
+                } else {
+                    picker(groups: list.groups, canCreate: list.canCreate)
+                }
             }
         }
     }
 
-    /// Shown when the account is in no groups at all.
-    ///
-    /// Deliberately a slot rather than a sentence buried in the picker: the
-    /// planned in-app group creation replaces this with a "Start a group"
-    /// affordance, and nothing else about the sheet needs to change when it
-    /// does. Copy stands alone with no reference to any other surface.
+    /// Shown when the account is in no groups and may not start one.
+    /// Copy stands alone with no reference to any other surface.
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("No groups yet")
@@ -155,28 +174,44 @@ struct TrackShareSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func picker(groups: [HumanGroup]) -> some View {
+    /// Shown in place of the empty state when the account is in no groups
+    /// and the server says it may start one.
+    private var emptyStartGroup: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ShareFlowCopy.startGroup)
+                .font(.callout.weight(.semibold))
+            Text(ShareFlowCopy.startGroupHint)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Button(ShareFlowCopy.startGroup) {
+                viewModel.startGroup()
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func picker(groups: [HumanGroup], canCreate: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Share to groups")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(groups) { group in
+                    pickerRow(group)
+                }
+
+                // The demo group, or a friend's group the person joined,
+                // means the list is usually not empty, so Start a group has
+                // to sit beside it rather than only in the empty state.
+                if canCreate {
                     Button {
-                        viewModel.toggleGroup(group.id)
+                        viewModel.startGroup()
                     } label: {
-                        let isSelected = viewModel.selectedGroupIds.contains(group.id)
-                        HStack(spacing: 12) {
-                            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                // The ternary can't unify `.tint` with
-                                // `.secondary`, so coerce both to `Color`.
-                                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                            Text(group.name)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                        }
+                        Label(ShareFlowCopy.startGroup, systemImage: "plus.circle")
                     }
-                    .buttonStyle(.plain)
+                    .padding(.top, 4)
                 }
             }
 
@@ -202,12 +237,132 @@ struct TrackShareSheet: View {
         }
     }
 
+    /// One group: the checkbox row, and an Invite icon as its own tap target
+    /// when the group has a link to send. The demo group has none, so it
+    /// shows no icon.
+    private func pickerRow(_ group: HumanGroup) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                viewModel.toggleGroup(group.id)
+            } label: {
+                let isSelected = viewModel.selectedGroupIds.contains(group.id)
+                HStack(spacing: 12) {
+                    Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                        // The ternary can't unify `.tint` with
+                        // `.secondary`, so coerce both to `Color`.
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    Text(group.name)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if let inviteURL = group.inviteURL {
+                ShareLink(
+                    item: inviteURL,
+                    message: Text(ShareFlowCopy.inviteMessage(for: group.name))
+                ) {
+                    Image(systemName: "person.badge.plus")
+                }
+                .accessibilityLabel(ShareFlowCopy.inviteAccessibilityLabel(for: group.name))
+            }
+        }
+    }
+
+    // MARK: - Starting a group
+
+    private func startGroupForm(canCreate: Bool) -> some View {
+        let canSubmit = canCreate
+            && !viewModel.isCreatingGroup
+            && HumanGroup.validName(groupNameDraft) != nil
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(ShareFlowCopy.startGroup)
+                .font(.headline)
+
+            TextField(ShareFlowCopy.groupNamePlaceholder, text: $groupNameDraft)
+                .textFieldStyle(.roundedBorder)
+                .submitLabel(.done)
+                .focused($isGroupNameFocused)
+                .disabled(viewModel.isCreatingGroup)
+                .onSubmit {
+                    if canSubmit { Task { await createGroup() } }
+                }
+                .onChange(of: groupNameDraft) { newValue in
+                    if newValue.count > HumanGroup.nameMaxLength {
+                        groupNameDraft = String(newValue.prefix(HumanGroup.nameMaxLength))
+                    }
+                }
+
+            Button {
+                Task { await createGroup() }
+            } label: {
+                if viewModel.isCreatingGroup {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text(ShareFlowCopy.createSubmit)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!canSubmit)
+
+            if let error = viewModel.createError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Button(ShareFlowCopy.createCancel) {
+                viewModel.cancelStartGroup()
+            }
+            .font(.callout)
+            .disabled(viewModel.isCreatingGroup)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { isGroupNameFocused = true }
+    }
+
+    /// The moment after a create. Invite is the next tap rather than a share
+    /// sheet opened automatically: `ShareLink` only opens on a tap, and a
+    /// system sheet the person did not ask for is the wrong pattern anyway.
+    private func groupCreatedState(_ group: HumanGroup) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ShareFlowCopy.groupReady)
+                    .font(.headline)
+                Text(group.name)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let inviteURL = group.inviteURL {
+                ShareLink(
+                    item: inviteURL,
+                    message: Text(ShareFlowCopy.inviteMessageAfterCreate)
+                ) {
+                    Label(ShareFlowCopy.inviteAFriend, systemImage: "person.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            Button(ShareFlowCopy.shareTrackToNewGroup) {
+                viewModel.returnToPicker()
+            }
+            .font(.callout)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     /// What the sheet shows once a share has landed.
     ///
     /// Its own view on purpose. This is the moment the notifications
-    /// permission ask is meant to ride, and the moment group invites will
-    /// hang off later; both want somewhere to live that is not tangled into
-    /// the picker.
+    /// permission ask is meant to ride, and it wants somewhere to live that
+    /// is not tangled into the picker.
     private func shareSuccessState(results: [ShareResult], groups: [HumanGroup]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(results, id: \.groupId) { result in
@@ -289,6 +444,15 @@ struct TrackShareSheet: View {
         await offerNotificationsIfThisIsTheMoment()
     }
 
+    private func createGroup() async {
+        guard let token = auth.token else { return }
+        await viewModel.createGroup(
+            groupNameDraft,
+            token: token,
+            onUnauthorized: { @MainActor in auth.signOut() }
+        )
+    }
+
     private func submitName() async {
         guard let token = auth.token, let historyId else { return }
         let profile = await viewModel.submitName(
@@ -338,16 +502,38 @@ final class TrackShareViewModel: ObservableObject {
 
     /// Unloaded and empty are different things and must render differently.
     /// A failed fetch showing "No groups yet" would tell someone with ten
-    /// groups that they have none, and in the planned creation flow it would
-    /// offer to make another one on top of the ones they already have.
+    /// groups that they have none, and could offer Start a group to an
+    /// account the server would refuse.
     ///
     /// A failure also says whether trying again can help. A disabled account
     /// fails the same way every time, and a Try again button under it would
     /// be a promise the app cannot keep.
+    ///
+    /// Start a group renders only from `.loaded` with `canCreate` true, so a
+    /// failed or unfinished fetch can never offer it.
     enum GroupsState: Equatable {
         case loading
-        case loaded([HumanGroup])
+        case loaded(GroupList)
         case failed(message: String, retryable: Bool)
+    }
+
+    /// What the loaded groups section shows, when it is not showing the
+    /// outcome of a share.
+    enum Panel: Equatable {
+        case picker
+        /// The field for naming a new group.
+        case startingGroup
+        /// The display-name prompt, and what to retry once the name is saved.
+        case askingForName(then: RefusedAction)
+        /// The moment after a create, with Invite as the next tap.
+        case groupCreated(HumanGroup)
+    }
+
+    /// The action a missing display name refused, held so it can be retried
+    /// without the person starting it again.
+    enum RefusedAction: Equatable {
+        case share
+        case createGroup(name: String)
     }
 
     @Published private(set) var groupsState: GroupsState = .loading
@@ -355,13 +541,20 @@ final class TrackShareViewModel: ObservableObject {
     @Published private(set) var isSharing: Bool = false
     @Published private(set) var shareResults: [ShareResult]?
     @Published private(set) var shareError: String?
+    @Published private(set) var panel: Panel = .picker
 
-    /// True once a share has been refused for want of a display name. The
-    /// sheet swaps the picker for `DisplayNamePrompt` while it holds, and the
-    /// selection is kept so the share can be retried without starting over.
-    @Published private(set) var isAskingForName: Bool = false
     @Published private(set) var isSavingName: Bool = false
     @Published private(set) var nameError: String?
+
+    @Published private(set) var isCreatingGroup: Bool = false
+    @Published private(set) var createError: String?
+
+    /// True while the display-name prompt is up. The selection is kept, so a
+    /// refused share can be retried without starting over.
+    var isAskingForName: Bool {
+        if case .askingForName = panel { return true }
+        return false
+    }
 
     private let client: HTTPClient
 
@@ -393,9 +586,9 @@ final class TrackShareViewModel: ObservableObject {
         )
 
         do {
-            let groups = try await api.groups()
-            let available = Set(groups.map(\.id))
-            groupsState = .loaded(groups)
+            let list = try await api.groups()
+            let available = Set(list.groups.map(\.id))
+            groupsState = .loaded(list)
             selectedGroupIds = Set(alreadySharedTo).intersection(available)
         } catch APIError.listenDisabled {
             groupsState = .failed(message: ShareFlowCopy.listenDisabled, retryable: false)
@@ -430,8 +623,8 @@ final class TrackShareViewModel: ObservableObject {
         )
     }
 
-    /// Save a display name after a share was refused for want of one, then
-    /// retry that share once.
+    /// Save a display name after a share or a create was refused for want of
+    /// one, then retry the refused action once.
     ///
     /// Returns the updated profile so the caller can refresh anything that
     /// shows the name, or nil when the name was not saved. The retry may not
@@ -459,20 +652,124 @@ final class TrackShareViewModel: ObservableObject {
             return nil
         }
 
-        isAskingForName = false
-        await performShare(
-            historyId: historyId,
-            token: token,
-            onUnauthorized: onUnauthorized,
-            mayAskForName: false
-        )
+        guard case .askingForName(let refused) = panel else { return profile }
+        switch refused {
+        case .share:
+            panel = .picker
+            await performShare(
+                historyId: historyId,
+                token: token,
+                onUnauthorized: onUnauthorized,
+                mayAskForName: false
+            )
+        case .createGroup(let name):
+            panel = .startingGroup
+            await performCreate(
+                name: name,
+                token: token,
+                onUnauthorized: onUnauthorized,
+                mayAskForName: false
+            )
+        }
         return profile
     }
 
-    /// Leave the name prompt and go back to the picker, selection intact.
+    /// Leave the name prompt and go back to where the refused action started:
+    /// the picker with its selection, or the group-name field.
     func cancelNameEntry() {
-        isAskingForName = false
+        if case .askingForName(.createGroup) = panel {
+            panel = .startingGroup
+        } else {
+            panel = .picker
+        }
         nameError = nil
+    }
+
+    // MARK: Starting a group
+
+    func startGroup() {
+        panel = .startingGroup
+        createError = nil
+    }
+
+    func cancelStartGroup() {
+        panel = .picker
+        createError = nil
+    }
+
+    /// From the created-group moment back to the picker, where the new group
+    /// is already ticked.
+    func returnToPicker() {
+        panel = .picker
+    }
+
+    /// Create a group with this name. A blank or over-long name sends
+    /// nothing.
+    func createGroup(
+        _ input: String,
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void
+    ) async {
+        guard let name = HumanGroup.validName(input) else { return }
+        await performCreate(
+            name: name,
+            token: token,
+            onUnauthorized: onUnauthorized,
+            mayAskForName: true
+        )
+    }
+
+    private func performCreate(
+        name: String,
+        token: String,
+        onUnauthorized: @Sendable @escaping () async -> Void,
+        mayAskForName: Bool
+    ) async {
+        isCreatingGroup = true
+        createError = nil
+        defer { isCreatingGroup = false }
+
+        let api = makeAPI(token: token, onUnauthorized: onUnauthorized)
+
+        do {
+            let group = try await api.createGroup(name: name)
+            await refreshGroupsInPlace(api: api, created: group)
+            selectedGroupIds.insert(group.id)
+            panel = .groupCreated(group)
+        } catch APIError.unauthorized {
+            // Already handled by the callback.
+        } catch APIError.nameRequired where mayAskForName {
+            panel = .askingForName(then: .createGroup(name: name))
+        } catch APIError.alreadyHasGroup {
+            // The list was stale. Re-read it so can_create comes back false
+            // and Start a group goes away.
+            createError = ShareFlowCopy.alreadyHasGroup
+            await refreshGroupsInPlace(api: api, created: nil)
+        } catch {
+            createError = ShareFlowCopy.createFailure(error)
+        }
+    }
+
+    /// Re-read the groups without passing through `.loading`, so the sheet
+    /// does not flash a spinner between states.
+    ///
+    /// After a create, the new group certainly exists, so if the re-read
+    /// fails or lags it is added to what is on screen, and `canCreate` drops
+    /// to false because the account now owns a group. That is the server's
+    /// own rule, applied to an answer it has just given.
+    private func refreshGroupsInPlace(api: ListenerAPI, created: HumanGroup?) async {
+        var list: GroupList
+        do {
+            list = try await api.groups()
+        } catch {
+            guard let created, case .loaded(let current) = groupsState else { return }
+            list = GroupList(groups: current.groups, canCreate: false)
+        }
+        if let created, !list.groups.contains(where: { $0.id == created.id }) {
+            list = GroupList(groups: list.groups + [created], canCreate: false)
+        }
+        groupsState = .loaded(list)
+        selectedGroupIds.formIntersection(list.groups.map(\.id))
     }
 
     private func performShare(
@@ -496,7 +793,7 @@ final class TrackShareViewModel: ObservableObject {
         } catch APIError.unauthorized {
             // Already handled by the callback.
         } catch APIError.nameRequired where mayAskForName {
-            isAskingForName = true
+            panel = .askingForName(then: .share)
         } catch APIError.notGroupMember {
             // Reload so the group they left drops out of the picker and out
             // of the selection, and Share does not post it again.

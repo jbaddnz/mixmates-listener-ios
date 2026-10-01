@@ -9,14 +9,29 @@ import Foundation
 
 // MARK: - Wire
 
+/// Both `can_create` and `invite_url` are optional on the wire. A required
+/// field would make an older server's response fail to decode, which would
+/// break the share picker outright rather than just hide Start a group.
 struct HumanGroupListDTO: Decodable {
     let items: [HumanGroupDTO]
+    let canCreate: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case canCreate = "can_create"
+    }
 }
 
 struct HumanGroupDTO: Decodable {
     let id: String
     let name: String
     let description: String?
+    let inviteUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description
+        case inviteUrl = "invite_url"
+    }
 }
 
 // MARK: - Domain
@@ -34,9 +49,46 @@ struct HumanGroup: Identifiable, Equatable {
     let name: String
     let description: String?
 
+    /// The link that admits a friend, for the person to send. Nil on the
+    /// demo group, which hides Invite there.
+    let inviteURL: URL?
+
     init(dto: HumanGroupDTO) {
         self.id = dto.id
         self.name = dto.name
         self.description = dto.description
+        self.inviteURL = dto.inviteUrl.flatMap(URL.init(string:))
+    }
+
+    /// The server's limit on a group name, counted after trimming.
+    static let nameMaxLength = 100
+
+    /// The name as it would be sent to `createGroup(name:)`, trimmed, or nil
+    /// when the server would refuse it as empty or too long.
+    static func validName(_ input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= nameMaxLength else { return nil }
+        return trimmed
+    }
+}
+
+/// The groups response: the groups themselves, and whether this account may
+/// start one.
+///
+/// `canCreate` is the server's decision and only ever read from a fresh
+/// response. It is never cached, never assumed when a fetch fails, and a
+/// missing field means no.
+struct GroupList: Equatable {
+    let groups: [HumanGroup]
+    let canCreate: Bool
+
+    init(groups: [HumanGroup], canCreate: Bool) {
+        self.groups = groups
+        self.canCreate = canCreate
+    }
+
+    init(dto: HumanGroupListDTO) {
+        self.groups = dto.items.map(HumanGroup.init(dto:))
+        self.canCreate = dto.canCreate ?? false
     }
 }

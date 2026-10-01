@@ -211,9 +211,24 @@ actor ListenerAPI {
         )
     }
 
-    func groups() async throws -> [HumanGroup] {
+    func groups() async throws -> GroupList {
         let dto: HumanGroupListDTO = try await request(path: "groups", method: "GET")
-        return dto.items.map(HumanGroup.init(dto:))
+        return GroupList(dto: dto)
+    }
+
+    /// Start a group with the caller as its creator and first member. The
+    /// returned group carries its invite link. No description is sent; the
+    /// app asks for a name only.
+    func createGroup(name: String) async throws -> HumanGroup {
+        struct Body: Encodable { let name: String }
+        let body = try JSONEncoder().encode(Body(name: name))
+        let dto: HumanGroupDTO = try await request(
+            path: "groups",
+            method: "POST",
+            body: body,
+            contentType: "application/json"
+        )
+        return HumanGroup(dto: dto)
     }
 
     func recordings() async throws -> [Recording] {
@@ -295,9 +310,18 @@ actor ListenerAPI {
                 throw APIError.notGroupMember(payload: payload)
             case "auth_listen_disabled":
                 throw APIError.listenDisabled(payload: payload)
+            case "already_has_group":
+                throw APIError.alreadyHasGroup(payload: payload)
             default:
                 throw APIError.http(status: http.statusCode, payload: payload)
             }
+
+        case 409:
+            let payload = decodeErrorPayload(data)
+            if payload?.code == "name_taken" {
+                throw APIError.nameTaken(payload: payload)
+            }
+            throw APIError.http(status: http.statusCode, payload: payload)
 
         case 400:
             let payload = decodeErrorPayload(data)

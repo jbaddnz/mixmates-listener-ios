@@ -70,8 +70,8 @@ struct TrackShareViewModelTests {
     }
 
     /// Empty is a real, renderable answer and must not read as a failure.
-    /// The sheet shows its "No groups yet" slot for this state, which the
-    /// planned group-creation flow replaces with a create affordance.
+    /// The sheet shows "No groups yet", or Start a group when the server
+    /// allows it.
     @Test func loadWithNoGroupsIsLoadedRatherThanFailed() async throws {
         let viewModel = makeViewModel(handler: { _ in
             StubResponses.ok(#"{ "data": { "items": [] } }"#)
@@ -419,6 +419,243 @@ struct TrackShareViewModelTests {
         #expect(viewModel.selectedGroupIds == ["g1"])
     }
 
+    // MARK: - Whether Start a group is offered
+
+    /// The server decides. `canCreate` comes only from a loaded response,
+    /// and the list's contents play no part.
+    @Test func loadCarriesCanCreateFromTheResponse() async throws {
+        let viewModel = makeViewModel(handler: { _ in StubResponses.ok(Fixtures.groupsWithCreate) })
+
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        #expect(loadedList(viewModel.groupsState)?.canCreate == true)
+    }
+
+    @Test func loadWithCanCreateFalseDoesNotOfferStart() async throws {
+        let viewModel = makeViewModel(handler: { _ in
+            StubResponses.ok(#"{ "data": { "can_create": false, "items": [] } }"#)
+        })
+
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        #expect(loadedList(viewModel.groupsState)?.canCreate == false)
+    }
+
+    /// Missing means no, even with an empty list.
+    @Test func loadWithTheFieldMissingDoesNotOfferStart() async throws {
+        let viewModel = makeViewModel(handler: { _ in
+            StubResponses.ok(#"{ "data": { "items": [] } }"#)
+        })
+
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        #expect(loadedList(viewModel.groupsState)?.canCreate == false)
+    }
+
+    /// A failed fetch, offline included, has no `canCreate` to read, so
+    /// there is nothing that could offer Start a group.
+    @Test func loadFailureCarriesNoCanCreate() async throws {
+        let viewModel = makeViewModel(handler: { _ in throw URLError(.notConnectedToInternet) })
+
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        #expect(loadedList(viewModel.groupsState) == nil)
+    }
+
+    // MARK: - Starting a group
+
+    /// After a create: the success moment with the new group's invite link,
+    /// and the group already in the picker and ticked, without a restart.
+    @Test func createGroupShowsTheCreatedMomentAndAddsTheGroup() async throws {
+        let log = RequestLog()
+        let groupLoads = CallCounter()
+        let viewModel = makeViewModel(handler: { request in
+            log.append(request)
+            switch route(request) {
+            case "POST groups":
+                return StubResponses.http(201, body: Fixtures.createdGroup)
+            default:
+                return groupLoads.next() == 1
+                    ? StubResponses.ok(Fixtures.groupsWithCreate)
+                    : StubResponses.ok(#"""
+                    { "data": { "can_create": false, "items": [
+                      { "id": "g1", "name": "Wellington Batucada", "description": null, "invite_url": null },
+                      { "id": "g_new", "name": "Kitchen Disco", "description": null,
+                        "invite_url": "https://mixmat.es/invite/NeWgRoUp5678" } ] } }
+                    """#)
+            }
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+        viewModel.startGroup()
+
+        await viewModel.createGroup("  Kitchen Disco ", token: "t", onUnauthorized: {})
+
+        guard case .groupCreated(let group) = viewModel.panel else {
+            Issue.record("Expected the created state, got \(viewModel.panel)")
+            return
+        }
+        #expect(group.id == "g_new")
+        #expect(group.inviteURL == URL(string: "https://mixmat.es/invite/NeWgRoUp5678"))
+        #expect(loadedGroups(viewModel.groupsState)?.map(\.id).contains("g_new") == true)
+        #expect(loadedList(viewModel.groupsState)?.canCreate == false)
+        #expect(viewModel.selectedGroupIds == ["g_new"])
+        #expect(log.methods == ["GET", "POST", "GET"])
+        let body = log.requests[1].httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["name"] as? String == "Kitchen Disco")
+
+        viewModel.returnToPicker()
+        #expect(viewModel.panel == .picker)
+        #expect(viewModel.selectedGroupIds == ["g_new"])
+    }
+
+    /// The group exists once the create succeeded, so a failed re-read must
+    /// not lose it, and the account now owns one so Start goes away.
+    @Test func createGroupKeepsTheNewGroupWhenTheReloadFails() async throws {
+        let groupLoads = CallCounter()
+        let viewModel = makeViewModel(handler: { request in
+            switch route(request) {
+            case "POST groups":
+                return StubResponses.http(201, body: Fixtures.createdGroup)
+            default:
+                if groupLoads.next() == 1 { return StubResponses.ok(Fixtures.groupsWithCreate) }
+                throw URLError(.timedOut)
+            }
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        await viewModel.createGroup("Kitchen Disco", token: "t", onUnauthorized: {})
+
+        #expect(loadedGroups(viewModel.groupsState)?.map(\.id) == ["g1", "g_demo", "g_new"])
+        #expect(loadedList(viewModel.groupsState)?.canCreate == false)
+        #expect(viewModel.selectedGroupIds == ["g_new"])
+    }
+
+    @Test func createGroupNameTakenKeepsThePersonInTheField() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            if route(request) == "POST groups" {
+                return StubResponses.http(409, body: Self.errorBody("name_taken"))
+            }
+            return StubResponses.ok(Fixtures.groupsWithCreate)
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+        viewModel.startGroup()
+
+        await viewModel.createGroup("Friends", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.panel == .startingGroup)
+        #expect(viewModel.createError == "That name's taken. Try adding something of your own to it.")
+    }
+
+    /// The list was stale. Say so in the agreed words and re-read it, so
+    /// can_create comes back false and Start goes away.
+    @Test func createGroupAlreadyHasGroupSaysSoAndRefreshes() async throws {
+        let groupLoads = CallCounter()
+        let viewModel = makeViewModel(handler: { request in
+            if route(request) == "POST groups" {
+                return StubResponses.http(403, body: Self.errorBody("already_has_group"))
+            }
+            return groupLoads.next() == 1
+                ? StubResponses.ok(Fixtures.groupsWithCreate)
+                : StubResponses.ok(#"{ "data": { "can_create": false, "items": [] } }"#)
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+        viewModel.startGroup()
+
+        await viewModel.createGroup("Second", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.createError == "This account already has a group.")
+        #expect(loadedList(viewModel.groupsState)?.canCreate == false)
+        #expect(groupLoads.count == 2)
+    }
+
+    @Test func createGroupRateLimitedSaysToWait() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            if route(request) == "POST groups" {
+                return StubResponses.http(429, headers: ["Retry-After": "600"])
+            }
+            return StubResponses.ok(Fixtures.groupsWithCreate)
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        await viewModel.createGroup("Kitchen Disco", token: "t", onUnauthorized: {})
+
+        #expect(viewModel.createError == ShareFlowCopy.tooManyTries)
+    }
+
+    @Test func createGroupIgnoresABlankName() async throws {
+        let log = RequestLog()
+        let viewModel = makeViewModel(handler: { request in
+            log.append(request)
+            return StubResponses.ok(Fixtures.groupsWithCreate)
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+
+        await viewModel.createGroup("   ", token: "t", onUnauthorized: {})
+
+        #expect(log.methods == ["GET"])
+    }
+
+    @Test func cancelStartGroupReturnsToThePicker() async throws {
+        let viewModel = makeViewModel(handler: { _ in StubResponses.ok(Fixtures.groupsWithCreate) })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+        viewModel.startGroup()
+
+        viewModel.cancelStartGroup()
+
+        #expect(viewModel.panel == .picker)
+    }
+
+    /// A create refused for want of a name asks for one, keeps the typed
+    /// group name, and creates the group once the name is saved.
+    @Test func createGroupNameRequiredAsksThenCreatesOnce() async throws {
+        let log = RequestLog()
+        let creates = CallCounter()
+        let viewModel = makeViewModel(handler: { request in
+            log.append(request)
+            switch route(request) {
+            case "POST groups":
+                return creates.next() == 1
+                    ? StubResponses.http(403, body: Self.errorBody("name_required"))
+                    : StubResponses.http(201, body: Fixtures.createdGroup)
+            case "PATCH me":
+                return StubResponses.ok(Fixtures.authMe)
+            default:
+                return StubResponses.ok(Fixtures.groupsWithCreate)
+            }
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+        viewModel.startGroup()
+
+        await viewModel.createGroup("Kitchen Disco", token: "t", onUnauthorized: {})
+        #expect(viewModel.panel == .askingForName(then: .createGroup(name: "Kitchen Disco")))
+
+        let profile = await viewModel.submitName("Jamie", historyId: "h_1", token: "t", onUnauthorized: {})
+
+        #expect(profile?.displayName == "Jamie")
+        if case .groupCreated = viewModel.panel {} else {
+            Issue.record("Expected the created state, got \(viewModel.panel)")
+        }
+        #expect(log.methods == ["GET", "POST", "PATCH", "POST", "GET"])
+    }
+
+    /// Not now on a name asked for by a create goes back to the group-name
+    /// field, not the picker.
+    @Test func cancelNameEntryFromACreateReturnsToTheField() async throws {
+        let viewModel = makeViewModel(handler: { request in
+            if route(request) == "POST groups" {
+                return StubResponses.http(403, body: Self.errorBody("name_required"))
+            }
+            return StubResponses.ok(Fixtures.groupsWithCreate)
+        })
+        await viewModel.load(preselecting: [], token: "t", onUnauthorized: {})
+        viewModel.startGroup()
+        await viewModel.createGroup("Kitchen Disco", token: "t", onUnauthorized: {})
+
+        viewModel.cancelNameEntry()
+
+        #expect(viewModel.panel == .startingGroup)
+    }
+
     /// Static so the `@Sendable` stub handlers can reach it; an instance
     /// helper would inherit the suite's main-actor isolation.
     private nonisolated static func errorBody(_ code: String) -> String {
@@ -432,8 +669,18 @@ struct TrackShareViewModelTests {
 /// `@MainActor`, and a helper declared on it inherits that isolation, which
 /// makes it unusable from the `@Sendable` stub handlers.
 private func loadedGroups(_ state: TrackShareViewModel.GroupsState) -> [HumanGroup]? {
-    if case .loaded(let groups) = state { return groups }
+    loadedList(state)?.groups
+}
+
+private func loadedList(_ state: TrackShareViewModel.GroupsState) -> GroupList? {
+    if case .loaded(let list) = state { return list }
     return nil
+}
+
+/// "METHOD last-path-component", e.g. "POST groups" or "POST share", so a
+/// stub can answer the create and the share differently.
+private func route(_ request: URLRequest) -> String {
+    "\(request.httpMethod ?? "") \(request.url?.lastPathComponent ?? "")"
 }
 
 private actor UnauthorizedSignal {

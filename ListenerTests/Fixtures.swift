@@ -224,6 +224,30 @@ enum Fixtures {
     }
     """#
 
+    /// The current shape: `can_create` beside `items`, and `invite_url` on
+    /// each group, null on the demo group. `groups` above is the older shape
+    /// with neither field, kept so the app keeps decoding it.
+    static let groupsWithCreate = #"""
+    {
+      "data": {
+        "can_create": true,
+        "items": [
+          { "id": "g1", "name": "Wellington Batucada", "description": null,
+            "invite_url": "https://mixmat.es/invite/AbCdEfGh1234" },
+          { "id": "g_demo", "name": "MixMates Demo", "description": "Try sharing here",
+            "invite_url": null }
+        ]
+      }
+    }
+    """#
+
+    static let createdGroup = #"""
+    {
+      "data": { "id": "g_new", "name": "Kitchen Disco", "description": null,
+                "invite_url": "https://mixmat.es/invite/NeWgRoUp5678" }
+    }
+    """#
+
     static let share = #"""
     {
       "data": {

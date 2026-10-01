@@ -125,6 +125,43 @@ struct DecodingTests {
         #expect(groups[1].description == nil)
     }
 
+    /// An older response with neither new field still decodes, reads as
+    /// "may not create", and has no invite links. A required field here
+    /// would break the share picker, not just hide Start a group.
+    @Test func decodesGroupsWithoutTheNewFieldsAsNoCreateAndNoInvites() throws {
+        let envelope = try decoder.decode(APIResponse<HumanGroupListDTO>.self, from: Data(Fixtures.groups.utf8))
+        let list = GroupList(dto: envelope.data)
+
+        #expect(list.canCreate == false)
+        #expect(list.groups.count == 2)
+        #expect(list.groups.allSatisfy { $0.inviteURL == nil })
+    }
+
+    @Test func decodesGroupsWithCanCreateAndInviteLinks() throws {
+        let envelope = try decoder.decode(APIResponse<HumanGroupListDTO>.self, from: Data(Fixtures.groupsWithCreate.utf8))
+        let list = GroupList(dto: envelope.data)
+
+        #expect(list.canCreate)
+        #expect(list.groups[0].inviteURL == URL(string: "https://mixmat.es/invite/AbCdEfGh1234"))
+        #expect(list.groups[1].inviteURL == nil)
+    }
+
+    @Test func decodesGroupsWithCanCreateFalse() throws {
+        let json = #"{ "data": { "can_create": false, "items": [] } }"#
+        let envelope = try decoder.decode(APIResponse<HumanGroupListDTO>.self, from: Data(json.utf8))
+
+        #expect(GroupList(dto: envelope.data).canCreate == false)
+    }
+
+    @Test func decodesCreatedGroup() throws {
+        let envelope = try decoder.decode(APIResponse<HumanGroupDTO>.self, from: Data(Fixtures.createdGroup.utf8))
+        let group = HumanGroup(dto: envelope.data)
+
+        #expect(group.id == "g_new")
+        #expect(group.name == "Kitchen Disco")
+        #expect(group.inviteURL == URL(string: "https://mixmat.es/invite/NeWgRoUp5678"))
+    }
+
     // MARK: - Share
 
     @Test func decodesShareResponse() throws {

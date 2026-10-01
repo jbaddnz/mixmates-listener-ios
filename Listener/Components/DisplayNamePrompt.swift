@@ -17,6 +17,11 @@ struct DisplayNamePrompt: View {
     @Binding var name: String
     let isSaving: Bool
     let error: String?
+
+    /// "Save and share" when a share is waiting on the name, "Save" when it
+    /// is starting a group.
+    var submitLabel: String = ShareFlowCopy.nameSubmit
+
     let onSubmit: () -> Void
     let onCancel: () -> Void
 
@@ -45,13 +50,20 @@ struct DisplayNamePrompt: View {
                 .onSubmit {
                     if canSubmit { onSubmit() }
                 }
+                // Capped as it is typed, so an over-long name stops growing
+                // rather than leaving a button disabled for no visible reason.
+                .onChange(of: name) { newValue in
+                    if newValue.count > UserProfile.displayNameMaxLength {
+                        name = String(newValue.prefix(UserProfile.displayNameMaxLength))
+                    }
+                }
 
             Button(action: onSubmit) {
                 if isSaving {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 } else {
-                    Text(ShareFlowCopy.nameSubmit)
+                    Text(submitLabel)
                         .frame(maxWidth: .infinity)
                 }
             }

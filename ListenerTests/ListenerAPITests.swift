@@ -440,6 +440,53 @@ struct ListenerAPITests {
         }
     }
 
+    @Test func groupsReturnsCanCreateBesideTheItems() async throws {
+        let api = makeAPI(handler: { _ in StubResponses.ok(Fixtures.groupsWithCreate) })
+
+        let list = try await api.groups()
+
+        #expect(list.canCreate)
+        #expect(list.groups.map(\.id) == ["g1", "g_demo"])
+    }
+
+    @Test func createGroupPostsTheNameOnlyAndReturnsTheGroup() async throws {
+        let captured = RequestCapture()
+        let api = makeAPI(handler: { req in
+            captured.set(req)
+            return StubResponses.http(201, body: Fixtures.createdGroup)
+        })
+
+        let group = try await api.createGroup(name: "Kitchen Disco")
+
+        #expect(captured.value?.httpMethod == "POST")
+        #expect(captured.value?.url?.path.hasSuffix("/groups") == true)
+        let body = captured.value?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        #expect(body?["name"] as? String == "Kitchen Disco")
+        #expect(body?["description"] == nil)
+        #expect(group.id == "g_new")
+        #expect(group.inviteURL != nil)
+    }
+
+    @Test func createGroupNameTakenBecomesItsOwnError() async throws {
+        let api = makeAPI(handler: { _ in
+            StubResponses.http(409, body: #"{"error":{"code":"name_taken","message":"m"}}"#)
+        })
+
+        await #expect(throws: APIError.nameTaken(payload: APIErrorPayload(code: "name_taken", message: "m"))) {
+            _ = try await api.createGroup(name: "Friends")
+        }
+    }
+
+    @Test func createGroupAlreadyHasGroupBecomesItsOwnError() async throws {
+        let api = makeAPI(handler: { _ in
+            StubResponses.http(403, body: #"{"error":{"code":"already_has_group","message":"m"}}"#)
+        })
+
+        await #expect(throws: APIError.alreadyHasGroup(payload: APIErrorPayload(code: "already_has_group", message: "m"))) {
+            _ = try await api.createGroup(name: "Second")
+        }
+    }
+
     @Test func http403WithUnknownCodeFallsBackToGenericHTTPError() async throws {
         let api = makeAPI(handler: { _ in
             StubResponses.http(403, body: #"{"error":{"code":"something_new","message":"m"}}"#)
