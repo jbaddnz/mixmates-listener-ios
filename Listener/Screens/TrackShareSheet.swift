@@ -210,10 +210,12 @@ struct TrackShareSheet: View {
             Text(ShareFlowCopy.startGroupHint)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button(ShareFlowCopy.startGroup) {
+            Button {
                 viewModel.startGroup()
+            } label: {
+                Text(ShareFlowCopy.startGroup)
+                    .brandCapsule()
             }
-            .buttonStyle(.borderedProminent)
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -232,11 +234,15 @@ struct TrackShareSheet: View {
                 // The demo group, or a friend's group the person joined,
                 // means the list is usually not empty, so Start a group has
                 // to sit beside it rather than only in the empty state.
+                // Brand-coloured text rather than a full capsule: a second
+                // hero button stacked on Share would compete with it.
                 if canCreate {
                     Button {
                         viewModel.startGroup()
                     } label: {
                         Label(ShareFlowCopy.startGroup, systemImage: "plus.circle")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(LinearGradient.mixmatesBrand)
                     }
                     .padding(.top, 4)
                 }
@@ -334,12 +340,9 @@ struct TrackShareSheet: View {
                         Text(ShareFlowCopy.createSubmit)
                     }
                 }
-                .brandCapsule()
-                // The capsule's colours are explicit, so the system does not
-                // dim them when the button is disabled. Fade it by hand so an
-                // empty name does not look tappable. Not while creating,
-                // where the spinner already says it is working.
-                .opacity(canSubmit || viewModel.isCreatingGroup ? 1 : 0.4)
+                // Full strength while creating: the spinner already says it
+                // is working.
+                .brandCapsule(looksEnabled: canSubmit || viewModel.isCreatingGroup)
             }
             .disabled(!canSubmit)
 

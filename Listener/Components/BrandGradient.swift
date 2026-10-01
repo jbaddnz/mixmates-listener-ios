@@ -34,11 +34,16 @@ extension View {
     /// as Share on the track card or Invite a friend after starting a group.
     /// Applied to a button's label rather than as a button style, so it works
     /// the same inside `Button` and `ShareLink`.
-    func brandCapsule() -> some View {
+    ///
+    /// Pass `looksEnabled: false` alongside `.disabled(true)`. The capsule's
+    /// colours are explicit, so the system does not dim them for a disabled
+    /// button, and it would otherwise look tappable.
+    func brandCapsule(looksEnabled: Bool = true) -> some View {
         font(.callout.weight(.semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(Capsule().fill(LinearGradient.mixmatesBrand))
+            .opacity(looksEnabled ? 1 : 0.4)
     }
 }

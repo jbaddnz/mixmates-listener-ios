@@ -59,15 +59,18 @@ struct DisplayNamePrompt: View {
                 }
 
             Button(action: onSubmit) {
-                if isSaving {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text(submitLabel)
-                        .frame(maxWidth: .infinity)
+                Group {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text(submitLabel)
+                    }
                 }
+                // Full strength while saving: the spinner already says it
+                // is working.
+                .brandCapsule(looksEnabled: canSubmit || isSaving)
             }
-            .buttonStyle(.borderedProminent)
             .disabled(!canSubmit)
 
             if let error {
