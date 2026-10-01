@@ -73,7 +73,7 @@ struct TrackShareSheet: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom, 24)
+                .padding(.bottom, 8)
                 .measuringFittedHeight()
             }
         }
@@ -251,15 +251,18 @@ struct TrackShareSheet: View {
             Button {
                 Task { await share() }
             } label: {
-                if viewModel.isSharing {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text("Share")
-                        .frame(maxWidth: .infinity)
+                Group {
+                    if viewModel.isSharing {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("Share")
+                    }
                 }
+                // Full strength while sharing: the spinner already says it
+                // is working.
+                .brandCapsule(looksEnabled: !viewModel.selectedGroupIds.isEmpty || viewModel.isSharing)
             }
-            .buttonStyle(.borderedProminent)
             .disabled(viewModel.selectedGroupIds.isEmpty || viewModel.isSharing)
 
             if let error = viewModel.shareError {
