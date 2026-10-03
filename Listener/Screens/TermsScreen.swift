@@ -16,7 +16,7 @@ struct TermsScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Last updated: 3 July 2026")
+                Text("Last updated: 3 October 2026")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -24,7 +24,7 @@ struct TermsScreen: View {
 
                 section(
                     "1. The service",
-                    "Listener is a free music-recognition app. It records a short audio clip when you ask it to, identifies the song, and shows you public streaming links on Spotify, Tidal, and Apple Music. Your recognition history is saved to your account so you can find songs again."
+                    "Listener is a free music-recognition app. It records a short audio clip when you ask it to, identifies the song, and shows you public streaming links on Spotify, Tidal, and Apple Music. Your recognition history is saved to your account so you can find songs again. You can also share a song you have found with a group of friends, start a group of your own, and invite people to it."
                 )
 
                 section(
@@ -34,27 +34,32 @@ struct TermsScreen: View {
 
                 section(
                     "3. Your account",
-                    "You sign in with Apple or Google. One person, one account. You can delete your account at any time from inside the app (Settings → Delete account); deletion is immediate and removes your account and its data."
+                    "You sign in with Apple or Google. One person, one account. To take part in a group you need a display name you have chosen; a nickname is fine. You can delete your account at any time from inside the app (Settings → Delete account); deletion is immediate and removes your account and its data. Songs you shared into a group stay there without your name, so the group's history still makes sense to its other members."
                 )
 
                 section(
                     "4. Audio",
-                    "When you tap Listen, the app records roughly eleven seconds of audio and sends it to our recognition provider to identify the song. Clips are used only for identification and are not kept, unless you have opted in to saving recordings (see the privacy policy)."
+                    "When you tap Listen, the app records a short audio clip, up to 12 seconds, and sends it to our recognition provider to identify the song. Clips are used only for identification and are not kept, unless you have opted in to saving recordings (see the privacy policy)."
                 )
 
                 section(
-                    "5. Fair use",
+                    "5. Groups",
+                    "A group is a few people sharing music with each other. If you start one, anyone you send its invite link to can join. The members of a group see each other's display names and the songs each person shared. Don't use a group to share anything illegal or to harass anyone."
+                )
+
+                section(
+                    "6. Fair use",
                     "Usage limits apply identically to every account and exist to keep the service healthy. Don't attempt to circumvent them, automate the app, or use it in a way that interferes with anyone else's use."
                 )
 
                 section(
-                    "6. The usual conditions",
+                    "7. The usual conditions",
                     "The service is provided as-is; we do our best to keep it accurate and available but can't guarantee either. Nothing in these terms limits rights you have under New Zealand consumer law. These terms are governed by New Zealand law."
                 )
 
                 section(
-                    "7. Changes",
-                    "If we change these terms we'll update this page and the date above."
+                    "8. Changes",
+                    "If we change these terms we'll update this page and the date above. A change that reduces your rights takes effect at least 30 days after we post it. A change applies only from the date it takes effect, never to anything before it."
                 )
 
                 HStack(spacing: 4) {
